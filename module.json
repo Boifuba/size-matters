@@ -18,7 +18,7 @@
   },
       "packs": [
     {
-      "name": "yes-size-matters",
+      "name": "size-matters",
       "label": "Yes, Size Matters!",
       "path": "packs/yes-size-matters",
       "type": "Macro",
