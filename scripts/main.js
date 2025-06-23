@@ -312,7 +312,8 @@ class SizeMattersApp extends Application {
       return ui.notifications.warn("Select at least one cell!");
     }
 
-    this.clearGraphics();
+    // Clear existing graphics for this token
+    this.clearTokenGraphics();
 
     const gridType = canvas.grid.type;
     const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
@@ -323,12 +324,17 @@ class SizeMattersApp extends Application {
     const color = parseInt(this.settings.color.replace('#', '0x'));
     const fillColor = parseInt(this.settings.fillColor.replace('#', '0x'));
 
-    this._gridGraphics = new PIXI.Graphics();
-    this._gridGraphics.interactive = false;
-    this._gridGraphics.interactiveChildren = false;
+    // Get reference to the current token
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (!currentToken) return;
+
+    // Create new graphics and attach to token
+    currentToken.sizeMattersGrid = new PIXI.Graphics();
+    currentToken.sizeMattersGrid.interactive = false;
+    currentToken.sizeMattersGrid.interactiveChildren = false;
     
     if (this.settings.enableContour) {
-      this._gridGraphics.lineStyle(this.settings.thickness, color, this.settings.alpha);
+      currentToken.sizeMattersGrid.lineStyle(this.settings.thickness, color, this.settings.alpha);
     }
 
     selectedCells.forEach(cell => {
@@ -336,55 +342,67 @@ class SizeMattersApp extends Application {
         const hexRadius = size / Math.sqrt(3);
         const offset = this.axialToPixel(cell.q, cell.r, hexRadius, isPointyTop);
         if (this.settings.enableFill) {
-          this._gridGraphics.beginFill(fillColor, this.settings.alpha);
+          currentToken.sizeMattersGrid.beginFill(fillColor, this.settings.alpha);
         }
-        this.drawHex(this._gridGraphics, offset.x, offset.y, hexRadius, isPointyTop);
+        this.drawHex(currentToken.sizeMattersGrid, offset.x, offset.y, hexRadius, isPointyTop);
         if (this.settings.enableFill) {
-          this._gridGraphics.endFill();
+          currentToken.sizeMattersGrid.endFill();
         }
       } else {
         const offset = this.squareToPixel(cell.q, cell.r, size);
         if (this.settings.enableFill) {
-          this._gridGraphics.beginFill(fillColor, this.settings.alpha);
+          currentToken.sizeMattersGrid.beginFill(fillColor, this.settings.alpha);
         }
-        this.drawSquare(this._gridGraphics, offset.x - size/2, offset.y - size/2, size);
+        this.drawSquare(currentToken.sizeMattersGrid, offset.x - size/2, offset.y - size/2, size);
         if (this.settings.enableFill) {
-          this._gridGraphics.endFill();
+          currentToken.sizeMattersGrid.endFill();
         }
       }
     });
 
-    this._gridGraphics.visible = this.settings.gridVisible;
-    canvas.tokens.addChildAt(this._gridGraphics, 0);
+    currentToken.sizeMattersGrid.visible = this.settings.gridVisible;
+    canvas.tokens.addChildAt(currentToken.sizeMattersGrid, 0);
 
-    this._imageSprite = null;
+    // Handle image sprite
+    if (currentToken.sizeMattersImage) {
+      canvas.tokens.removeChild(currentToken.sizeMattersImage);
+      currentToken.sizeMattersImage.destroy();
+      currentToken.sizeMattersImage = null;
+    }
+
     if (this.settings.imageUrl && this.settings.imageUrl.trim() && this.settings.imageVisible) {
       try {
         const texture = await PIXI.Texture.fromURL(this.settings.imageUrl);
-        this._imageSprite = new PIXI.Sprite(texture);
-        this._imageSprite.anchor.set(0.5, 0.5);
-        this._imageSprite.scale.set(this.settings.imageScale);
-        this._imageSprite.visible = this.settings.imageVisible;
-        canvas.tokens.addChildAt(this._imageSprite, 1);
+        currentToken.sizeMattersImage = new PIXI.Sprite(texture);
+        currentToken.sizeMattersImage.anchor.set(0.5, 0.5);
+        currentToken.sizeMattersImage.scale.set(this.settings.imageScale);
+        currentToken.sizeMattersImage.visible = this.settings.imageVisible;
+        canvas.tokens.addChildAt(currentToken.sizeMattersImage, 1);
       } catch (error) {
         ui.notifications.warn("Failed to load image. Please check the path.");
       }
     }
 
-    this._gridTicker = () => {
-      const currentToken = canvas.tokens.get(this.tokenId);
-      if (!currentToken || !currentToken.document) return;
+    // Remove existing ticker if any
+    if (currentToken.sizeMattersGridTicker) {
+      canvas.app.ticker.remove(currentToken.sizeMattersGridTicker);
+    }
+
+    // Create new ticker for position updates
+    currentToken.sizeMattersGridTicker = () => {
+      const token = canvas.tokens.get(this.tokenId);
+      if (!token || !token.document) return;
       
-      const centerX = currentToken.center.x;
-      const centerY = currentToken.center.y;
-      const rotation = Math.toRadians(currentToken.document.rotation || 0);
+      const centerX = token.center.x;
+      const centerY = token.center.y;
+      const rotation = Math.toRadians(token.document.rotation || 0);
       
-      if (this._gridGraphics) {
-        this._gridGraphics.position.set(centerX, centerY);
-        this._gridGraphics.rotation = rotation;
+      if (token.sizeMattersGrid) {
+        token.sizeMattersGrid.position.set(centerX, centerY);
+        token.sizeMattersGrid.rotation = rotation;
       }
       
-      if (this._imageSprite) {
+      if (token.sizeMattersImage) {
         let offsetX = this.settings.imageOffsetX;
         let offsetY = this.settings.imageOffsetY;
         
@@ -397,12 +415,18 @@ class SizeMattersApp extends Application {
           offsetY = rotatedY;
         }
         
-        this._imageSprite.position.set(centerX + offsetX, centerY + offsetY);
-        this._imageSprite.rotation = rotation;
-        this._imageSprite.scale.set(this.settings.imageScale);
+        token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
+        token.sizeMattersImage.rotation = rotation;
+        token.sizeMattersImage.scale.set(this.settings.imageScale);
       }
     };
-    canvas.app.ticker.add(this._gridTicker);
+
+    canvas.app.ticker.add(currentToken.sizeMattersGridTicker);
+
+    // Store reference for easy access
+    this._gridGraphics = currentToken.sizeMattersGrid;
+    this._imageSprite = currentToken.sizeMattersImage;
+    this._gridTicker = currentToken.sizeMattersGridTicker;
 
     this.saveSettings();
   }
@@ -421,9 +445,10 @@ class SizeMattersApp extends Application {
   }
 
   toggleImageVisibility() {
-    if (this._imageSprite) {
-      this._imageSprite.visible = !this._imageSprite.visible;
-      this.settings.imageVisible = this._imageSprite.visible;
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersImage) {
+      currentToken.sizeMattersImage.visible = !currentToken.sizeMattersImage.visible;
+      this.settings.imageVisible = currentToken.sizeMattersImage.visible;
       this.saveSettings();
     } else {
       ui.notifications.warn("No image has been loaded!");
@@ -431,36 +456,53 @@ class SizeMattersApp extends Application {
   }
 
   toggleGridVisibility() {
-    if (this._gridGraphics) {
-      this._gridGraphics.visible = !this._gridGraphics.visible;
-      this.settings.gridVisible = this._gridGraphics.visible;
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersGrid) {
+      currentToken.sizeMattersGrid.visible = !currentToken.sizeMattersGrid.visible;
+      this.settings.gridVisible = currentToken.sizeMattersGrid.visible;
       this.saveSettings();
     } else {
       ui.notifications.warn("No grid has been drawn!");
     }
   }
 
+  clearTokenGraphics() {
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (!currentToken) return;
+
+    if (currentToken.sizeMattersGrid) {
+      canvas.tokens.removeChild(currentToken.sizeMattersGrid);
+      currentToken.sizeMattersGrid.destroy();
+      currentToken.sizeMattersGrid = null;
+    }
+    
+    if (currentToken.sizeMattersImage) {
+      canvas.tokens.removeChild(currentToken.sizeMattersImage);
+      currentToken.sizeMattersImage.destroy();
+      currentToken.sizeMattersImage = null;
+    }
+    
+    if (currentToken.sizeMattersGridTicker) {
+      canvas.app.ticker.remove(currentToken.sizeMattersGridTicker);
+      currentToken.sizeMattersGridTicker = null;
+    }
+
+    // Clear references
+    this._gridGraphics = null;
+    this._imageSprite = null;
+    this._gridTicker = null;
+  }
+
   clearGraphics() {
-    if (this._gridGraphics) {
-      canvas.tokens.removeChild(this._gridGraphics);
-      this._gridGraphics.destroy();
-      this._gridGraphics = null;
-    }
-    
-    if (this._imageSprite) {
-      canvas.tokens.removeChild(this._imageSprite);
-      this._imageSprite.destroy();
-      this._imageSprite = null;
-    }
-    
-    if (this._gridTicker) {
-      canvas.app.ticker.remove(this._gridTicker);
-      this._gridTicker = null;
-    }
+    // This method now only clears references, doesn't remove from canvas
+    this._gridGraphics = null;
+    this._imageSprite = null;
+    this._gridTicker = null;
   }
 
   clearAll(html) {
-    this.clearGraphics();
+    // Clear graphics from canvas
+    this.clearTokenGraphics();
     
     this.initializeGrid();
     
@@ -519,6 +561,7 @@ class SizeMattersApp extends Application {
   }
 
   async close(options = {}) {
+    // Only clear references, don't remove graphics from canvas
     this.clearGraphics();
     this.saveSettings();
     return super.close(options);
@@ -542,13 +585,21 @@ Hooks.once('ready', () => {
     }
 
     const currentToken = canvas.tokens.get(token.id);
-    if (currentToken && currentToken.sizeMattersHighlight) {
-      canvas.tokens.removeChild(currentToken.sizeMattersHighlight);
-      currentToken.sizeMattersHighlight.destroy();
-      currentToken.sizeMattersHighlight = null;
-      if (currentToken._gridTicker) {
-        canvas.app.ticker.remove(currentToken._gridTicker);
-        currentToken._gridTicker = null;
+    if (currentToken && currentToken.sizeMattersGrid) {
+      // Clean up existing graphics when opening for same token
+      if (currentToken.sizeMattersGrid) {
+        canvas.tokens.removeChild(currentToken.sizeMattersGrid);
+        currentToken.sizeMattersGrid.destroy();
+        currentToken.sizeMattersGrid = null;
+      }
+      if (currentToken.sizeMattersImage) {
+        canvas.tokens.removeChild(currentToken.sizeMattersImage);
+        currentToken.sizeMattersImage.destroy();
+        currentToken.sizeMattersImage = null;
+      }
+      if (currentToken.sizeMattersGridTicker) {
+        canvas.app.ticker.remove(currentToken.sizeMattersGridTicker);
+        currentToken.sizeMattersGridTicker = null;
       }
     }
 

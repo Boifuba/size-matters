@@ -28,7 +28,7 @@ A FoundryVTT module that allows you to create customizable highlights around tok
 
 ### Manifest URL
 ```
-[Add your manifest URL here when publishing]
+https://github.com/Boifuba/size-matters/releases/download/0.0.2/module.json
 ```
 
 ## Usage
@@ -146,15 +146,4 @@ Feel free to submit issues, feature requests, or pull requests on the project re
 
 ## License
 
-[Add your license information here]
-
-## Changelog
-
-### Version 1.0.0
-- Initial release with universal grid support
-- Interactive hex and square grid selection
-- Customizable colors and appearance
-- Image overlay system with real-time positioning
-- Token synchronization and movement tracking
-- Persistent settings and visibility controls
-- FoundryVTT native styling and UI
+MIT
