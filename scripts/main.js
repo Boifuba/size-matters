@@ -430,6 +430,24 @@ class SizeMattersApp extends Application {
     return svg;
   }
 
+  // CRITICAL: Method to regenerate and update the grid SVG
+  updateGridSVG(html) {
+    const gridType = canvas.grid.type;
+    const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
+                       CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
+    const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
+    
+    const newSVG = this.createGridSVG(isHexGrid, isPointyTop);
+    html.find('.grid-container').html(newSVG);
+    
+    // Re-attach click handlers to the new SVG elements
+    html.find('polygon[data-grid], rect[data-grid]').click((event) => {
+      const key = event.currentTarget.getAttribute('data-grid');
+      this.toggleGridCell(key, event.currentTarget);
+      this.drawGrid(html);
+    });
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
 
@@ -699,6 +717,7 @@ class SizeMattersApp extends Application {
     // Clear graphics from canvas
     this.clearTokenGraphics();
     
+    // CRITICAL: Reset the grid to initial state
     this.initializeGrid();
     
     this.settings = {
@@ -721,21 +740,11 @@ class SizeMattersApp extends Application {
     await this.token.document.unsetFlag('size-matters', 'settings');
 
     if (html) {
+      // Update form with default values
       this.updateFormFromSettings(html);
-
-      const gridType = canvas.grid.type;
-      const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
-                         CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-      const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
       
-      const newSVG = this.createGridSVG(isHexGrid, isPointyTop);
-      html.find('.grid-svg-container').html(newSVG);
-      
-      html.find('polygon[data-grid], rect[data-grid]').click((event) => {
-        const key = event.currentTarget.getAttribute('data-grid');
-        this.toggleGridCell(key, event.currentTarget);
-        this.drawGrid(html);
-      });
+      // CRITICAL: Regenerate the SVG with the reset grid
+      this.updateGridSVG(html);
     }
 
     ui.notifications.info("All settings cleared and reset to default!");
