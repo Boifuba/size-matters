@@ -1,86 +1,197 @@
-/* FoundryVTT Native Styling for Size Matters */
+/* Size Matters - Clean FoundryVTT Design */
 .size-matters-form {
   font-family: 'Signika', sans-serif;
-  padding: 10px;
   background: var(--color-bg);
-  border: 1px solid var(--color-border-light-primary);
-  border-radius: 3px;
-  min-width: 450px;
-}
-
-.settings-section {
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-border-light-tertiary);
-}
-
-.settings-section:last-of-type {
-  border-bottom: none;
-  margin-bottom: 10px;
-}
-
-.settings-section h3 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-dark-primary);
-  margin: 0 0 8px 0;
+  border: none;
   padding: 0;
-  border-bottom: 1px solid var(--color-border-light-tertiary);
-  padding-bottom: 4px;
+  margin: 0;
+  min-width: 460px;
+  max-width: 460px;
 }
 
-.form-group {
-  margin-bottom: 6px;
-}
-
-.form-group label {
-  font-weight: 600;
-  color: var(--color-text-dark-primary);
-  font-size: 12px;
-  margin-bottom: 2px;
-  display: block;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
+/* Grid Container */
+.grid-container {
+  margin-bottom: 16px;
 }
 
 .grid-svg-container {
   text-align: center;
   background: var(--color-bg-option);
   border: 1px solid var(--color-border-light-tertiary);
-  border-radius: 3px;
-  padding: 8px;
-  margin-bottom: 15px;
+  border-radius: 4px;
+  padding: 12px;
 }
 
 .grid-svg-container svg {
   border: 1px solid var(--color-border-light-secondary);
   border-radius: 3px;
-  background: var(--color-bg);
+  background: #ffffff;
   max-width: 100%;
   height: auto;
 }
 
-.file-picker-button {
+/* Control Sections */
+.control-section {
+  background: var(--color-bg-option);
+  border: 1px solid var(--color-border-light-tertiary);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.section-header {
+  background: var(--color-bg-btn);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-light-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-dark-primary);
+}
+
+.section-header i {
+  width: 14px;
+  text-align: center;
+}
+
+/* Form Groups */
+.form-group {
+  padding: 12px;
+}
+
+.control-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-light-tertiary);
+}
+
+.control-row:last-child {
+  border-bottom: none;
+}
+
+.control-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control-item label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-dark-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Slider Groups */
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border-light-tertiary);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border-highlight);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-group input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border-highlight);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.slider-group .value {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light-tertiary);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-dark-primary);
+  min-width: 32px;
+  text-align: center;
+}
+
+/* Color Inputs */
+input[type="color"] {
   width: 100%;
-  padding: 6px 10px;
+  height: 32px;
   border: 1px solid var(--color-border-light-primary);
   border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+}
+
+input[type="color"]:focus {
+  border-color: var(--color-border-highlight);
+  outline: none;
+}
+
+/* Checkboxes */
+.checkbox-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-border-highlight);
+}
+
+.checkbox-item label {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-text-dark-primary);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* File Picker Button */
+.file-picker-button {
+  width: 100%;
+  padding: 8px 12px;
   background: var(--color-bg-btn);
+  border: 1px solid var(--color-border-light-primary);
+  border-radius: 3px;
   color: var(--color-text-dark-primary);
   font-weight: 600;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.1s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 12px;
-  font-family: inherit;
+  transition: all 0.1s ease;
 }
 
 .file-picker-button:hover {
@@ -88,150 +199,80 @@
   border-color: var(--color-border-light-secondary);
 }
 
-.file-picker-button:active {
-  background: var(--color-bg-btn-active);
-}
-
-.color-input {
-  width: 100%;
-  height: 28px;
-  border: 1px solid var(--color-border-light-primary);
-  border-radius: 3px;
-  cursor: pointer;
-  background: var(--color-bg);
-}
-
-.color-input:focus {
-  border-color: var(--color-border-highlight);
-  outline: none;
-}
-
-.range-slider {
-  width: 65%;
-  margin-right: 6px;
-  accent-color: var(--color-border-highlight);
-}
-
-.range-value {
-  font-weight: 600;
-  color: var(--color-text-dark-primary);
+/* Action Section */
+.action-section {
+  padding: 12px;
   background: var(--color-bg-option);
-  padding: 2px 6px;
-  border-radius: 3px;
   border: 1px solid var(--color-border-light-tertiary);
-  min-width: 30px;
-  display: inline-block;
-  text-align: center;
-  font-size: 11px;
+  border-radius: 4px;
 }
 
-.checkbox-group {
+.button-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.checkbox-group input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--color-border-highlight);
-}
-
-.checkbox-group label {
-  margin: 0;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: normal;
-}
-
-.form-actions-group {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border-light-tertiary);
-}
-
-.form-actions {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.form-actions button {
-  padding: 6px 12px;
+.button-row:last-child {
+  margin-bottom: 0;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 8px 12px;
   border: 1px solid var(--color-border-light-primary);
   border-radius: 3px;
   font-weight: 600;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.1s ease;
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-family: inherit;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.1s ease;
   background: var(--color-bg-btn);
   color: var(--color-text-dark-primary);
 }
 
-.form-actions button:hover {
+.action-btn:hover {
   background: var(--color-bg-btn-hover);
   border-color: var(--color-border-light-secondary);
 }
 
-.form-actions button:active {
-  background: var(--color-bg-btn-active);
+.action-btn.primary {
+  background: #4CAF50;
+  border-color: #45a049;
+  color: white;
 }
 
-.draw-button {
-  background: var(--color-bg-btn-success);
-  border-color: var(--color-border-success);
-  color: var(--color-text-light-primary);
+.action-btn.primary:hover {
+  background: #45a049;
 }
 
-.draw-button:hover {
-  background: var(--color-bg-btn-success-hover);
+.action-btn.danger {
+  background: #f44336;
+  border-color: #da190b;
+  color: white;
 }
 
-.clear-button {
-  background: var(--color-bg-btn-danger);
-  border-color: var(--color-border-danger);
-  color: var(--color-text-light-primary);
+.action-btn.danger:hover {
+  background: #da190b;
 }
 
-.clear-button:hover {
-  background: var(--color-bg-btn-danger-hover);
-}
-
-.visibility-controls {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-  margin: 0;
-}
-
-.toggle-image-button {
-  background: var(--color-bg-btn-warning);
-  border-color: var(--color-border-warning);
+.action-btn.secondary {
+  background: var(--color-bg-btn);
+  border-color: var(--color-border-light-primary);
   color: var(--color-text-dark-primary);
 }
 
-.toggle-image-button:hover {
-  background: var(--color-bg-btn-warning-hover);
+.action-btn.secondary:hover {
+  background: var(--color-bg-btn-hover);
 }
 
-.toggle-grid-button {
-  background: var(--color-bg-btn-info);
-  border-color: var(--color-border-info);
-  color: var(--color-text-light-primary);
-}
-
-.toggle-grid-button:hover {
-  background: var(--color-bg-btn-info-hover);
-}
-
+/* Grid Interaction */
 .grid-selectable {
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
 }
 
 .grid-selectable:hover {
@@ -251,32 +292,15 @@
   fill: #ffffff !important;
 }
 
-/* Input styling to match FoundryVTT */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 3px;
-  background: var(--color-border-light-tertiary);
-  border-radius: 2px;
-  outline: none;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: var(--color-bg-btn);
-  border: 1px solid var(--color-border-light-primary);
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: var(--color-bg-btn);
-  border: 1px solid var(--color-border-light-primary);
-  border-radius: 50%;
-  cursor: pointer;
+/* Responsive adjustments */
+@media (max-width: 500px) {
+  .size-matters-form {
+    min-width: 100%;
+    max-width: 100%;
+  }
+  
+  .control-row {
+    flex-direction: column;
+    gap: 8px;
+  }
 }

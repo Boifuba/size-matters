@@ -30,7 +30,7 @@ export class SizeMattersApp extends Application {
       id: "size-matters",
       title: "Size Matters",
       template: "modules/size-matters/templates/size-matters-dialog.html",
-      width: 500,
+      width: 480,
       height: "auto",
       resizable: false,
       closeOnSubmit: false
@@ -163,73 +163,77 @@ export class SizeMattersApp extends Application {
     super.activateListeners(html);
 
     try {
+      // Grid cell selection
       html.find('polygon[data-grid], rect[data-grid]').click((event) => {
         const key = event.currentTarget.getAttribute('data-grid');
         this.toggleGridCell(key, event.currentTarget);
         this.drawGrid(html);
       });
 
+      // Real-time updates for all sliders and inputs
       html.find('input[name="thickness"]').on('input', (event) => {
         html.find('#tval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="alpha"]').on('input', (event) => {
         html.find('#aval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="imageScale"]').on('input', (event) => {
         html.find('#sval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="imageOffsetX"]').on('input', (event) => {
         html.find('#xval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="imageOffsetY"]').on('input', (event) => {
         html.find('#yval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
+      // Color changes
       html.find('input[name="color"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="fillColor"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
+      // Checkbox changes
       html.find('input[name="enableFill"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
       html.find('input[name="enableContour"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
+      // Button actions
       html.find('.file-picker-button').click(() => this.openFilePicker(html));
       html.find('.draw-button').click(() => this.drawGrid(html));
       html.find('.clear-button').click(() => this.clearAll(html));
       html.find('.toggle-image-button').click(() => this.toggleImageVisibility());
       html.find('.toggle-grid-button').click(() => this.toggleGridVisibility());
 
-      // CRITICAL FIX: Add drawGrid call to ensure real-time updates
-      html.find('input:not(.clear-button)').on('change', () => {
+      // Save settings on any change
+      html.find('input').on('change', () => {
         this.updateSettingsFromForm(html);
         this.saveSettings();
-        this.drawGrid(html); // This ensures immediate visual updates
       });
     } catch (error) {
       console.error("Size Matters: Error activating listeners", error);
@@ -252,18 +256,6 @@ export class SizeMattersApp extends Application {
     } catch (error) {
       console.error("Size Matters: Error opening file picker", error);
       ui.notifications?.error("Failed to open file picker");
-    }
-  }
-
-  updateImageScale() {
-    if (this._imageSprite) {
-      this.updateSettingsFromForm();
-    }
-  }
-
-  updateImagePosition() {
-    if (this._imageSprite) {
-      this.updateSettingsFromForm();
     }
   }
 
@@ -316,7 +308,8 @@ export class SizeMattersApp extends Application {
       
       const selectedCells = Object.values(this.grid).filter(h => h.selected);
       if (!selectedCells.length) {
-        ui.notifications?.warn("Select at least one cell!");
+        // Don't show warning for empty selection, just clear graphics
+        clearTokenSizeMattersGraphics(this.token);
         return;
       }
 
