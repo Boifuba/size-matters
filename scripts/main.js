@@ -1,3 +1,220 @@
+// Utility functions moved outside the class for global access
+function axialToPixel(q, r, radius, pointy) {
+  return pointy
+    ? { x: radius * Math.sqrt(3) * (q + r / 2), y: radius * 1.5 * r }
+    : { x: radius * 1.5 * q, y: radius * Math.sqrt(3) * (r + q / 2) };
+}
+
+function squareToPixel(x, y, size) {
+  return { x: x * size, y: y * size };
+}
+
+function drawHex(g, cx, cy, r, pointy) {
+  const startAngle = pointy ? -Math.PI / 2 : 0;
+  g.moveTo(cx + r * Math.cos(startAngle), cy + r * Math.sin(startAngle));
+  for (let i = 1; i <= 6; i++) {
+    const angle = startAngle + i * Math.PI / 3;
+    g.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+  }
+}
+
+function drawSquare(g, x, y, size) {
+  g.drawRect(x, y, size, size);
+}
+
+// Global function to draw Size Matters graphics for a token
+async function drawSizeMattersGraphicsForToken(token) {
+  if (!token || !token.document) return;
+  
+  const settings = token.document.getFlag('size-matters', 'settings');
+  if (!settings || !settings.grid) return;
+
+  const selectedCells = Object.values(settings.grid).filter(h => h.selected);
+  if (!selectedCells.length) return;
+
+  // Clear existing graphics for this token
+  clearTokenSizeMattersGraphics(token);
+
+  const gridType = canvas.grid.type;
+  const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
+                     CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
+  const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
+  const size = canvas.grid.size;
+
+  const color = parseInt(settings.color.replace('#', '0x'));
+  const fillColor = parseInt(settings.fillColor.replace('#', '0x'));
+
+  // Create new graphics and attach to token
+  token.sizeMattersGrid = new PIXI.Graphics();
+  token.sizeMattersGrid.interactive = false;
+  token.sizeMattersGrid.interactiveChildren = false;
+  
+  if (settings.enableContour) {
+    token.sizeMattersGrid.lineStyle(settings.thickness, color, settings.alpha);
+  }
+
+  selectedCells.forEach(cell => {
+    if (isHexGrid) {
+      const hexRadius = size / Math.sqrt(3);
+      const offset = axialToPixel(cell.q, cell.r, hexRadius, isPointyTop);
+      if (settings.enableFill) {
+        token.sizeMattersGrid.beginFill(fillColor, settings.alpha);
+      }
+      drawHex(token.sizeMattersGrid, offset.x, offset.y, hexRadius, isPointyTop);
+      if (settings.enableFill) {
+        token.sizeMattersGrid.endFill();
+      }
+    } else {
+      const offset = squareToPixel(cell.q, cell.r, size);
+      if (settings.enableFill) {
+        token.sizeMattersGrid.beginFill(fillColor, settings.alpha);
+      }
+      drawSquare(token.sizeMattersGrid, offset.x - size/2, offset.y - size/2, size);
+      if (settings.enableFill) {
+        token.sizeMattersGrid.endFill();
+      }
+    }
+  });
+
+  token.sizeMattersGrid.visible = settings.gridVisible !== false;
+  canvas.tokens.addChildAt(token.sizeMattersGrid, 0);
+
+  // Handle image sprite
+  if (settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible !== false) {
+    try {
+      const texture = await PIXI.Texture.fromURL(settings.imageUrl);
+      token.sizeMattersImage = new PIXI.Sprite(texture);
+      token.sizeMattersImage.anchor.set(0.5, 0.5);
+      token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+      token.sizeMattersImage.visible = settings.imageVisible !== false;
+      canvas.tokens.addChildAt(token.sizeMattersImage, 1);
+    } catch (error) {
+      console.warn("Size Matters: Failed to load image for token", token.id, error);
+    }
+  }
+
+  // Remove existing ticker if any
+  if (token.sizeMattersGridTicker) {
+    canvas.app.ticker.remove(token.sizeMattersGridTicker);
+  }
+
+  // Create new ticker for position updates
+  token.sizeMattersGridTicker = () => {
+    // Enhanced validation to prevent errors during scene changes
+    if (!token || !token.document || !token.center || !canvas || !canvas.tokens) {
+      // Token is invalid, remove the ticker
+      if (token && token.sizeMattersGridTicker) {
+        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+        token.sizeMattersGridTicker = null;
+      }
+      return;
+    }
+    
+    // Additional check to ensure token still exists in the canvas
+    if (!canvas.tokens.placeables.includes(token)) {
+      if (token.sizeMattersGridTicker) {
+        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+        token.sizeMattersGridTicker = null;
+      }
+      return;
+    }
+    
+    try {
+      const centerX = token.center.x;
+      const centerY = token.center.y;
+      const rotation = Math.toRadians(token.document.rotation || 0);
+      
+      if (token.sizeMattersGrid && token.sizeMattersGrid.parent) {
+        token.sizeMattersGrid.position.set(centerX, centerY);
+        token.sizeMattersGrid.rotation = rotation;
+      }
+      
+      if (token.sizeMattersImage && token.sizeMattersImage.parent) {
+        let offsetX = settings.imageOffsetX || 0;
+        let offsetY = settings.imageOffsetY || 0;
+        
+        if (rotation !== 0) {
+          const cos = Math.cos(rotation);
+          const sin = Math.sin(rotation);
+          const rotatedX = offsetX * cos - offsetY * sin;
+          const rotatedY = offsetX * sin + offsetY * cos;
+          offsetX = rotatedX;
+          offsetY = rotatedY;
+        }
+        
+        token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
+        token.sizeMattersImage.rotation = rotation;
+        token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+      }
+    } catch (error) {
+      console.warn("Size Matters: Error in ticker, removing ticker", error);
+      if (token.sizeMattersGridTicker) {
+        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+        token.sizeMattersGridTicker = null;
+      }
+    }
+  };
+
+  canvas.app.ticker.add(token.sizeMattersGridTicker);
+}
+
+// Global function to clear Size Matters graphics from a token
+function clearTokenSizeMattersGraphics(token) {
+  if (!token) return;
+
+  if (token.sizeMattersGrid) {
+    if (token.sizeMattersGrid.parent) {
+      token.sizeMattersGrid.parent.removeChild(token.sizeMattersGrid);
+    }
+    token.sizeMattersGrid.destroy();
+    token.sizeMattersGrid = null;
+  }
+  
+  if (token.sizeMattersImage) {
+    if (token.sizeMattersImage.parent) {
+      token.sizeMattersImage.parent.removeChild(token.sizeMattersImage);
+    }
+    token.sizeMattersImage.destroy();
+    token.sizeMattersImage = null;
+  }
+  
+  if (token.sizeMattersGridTicker) {
+    if (canvas.app?.ticker) {
+      canvas.app.ticker.remove(token.sizeMattersGridTicker);
+    }
+    token.sizeMattersGridTicker = null;
+  }
+}
+
+// Global function to clear all Size Matters graphics from all tokens
+function clearAllSizeMattersGraphics() {
+  console.log("Size Matters: Clearing all graphics and tickers");
+  
+  if (!canvas || !canvas.tokens) return;
+  
+  // Clear from all tokens in the current scene
+  for (const token of canvas.tokens.placeables) {
+    clearTokenSizeMattersGraphics(token);
+  }
+  
+  // Also clear any remaining tickers that might be orphaned
+  if (canvas.app?.ticker) {
+    // Remove any remaining Size Matters tickers
+    const tickerFunctions = canvas.app.ticker._head;
+    let current = tickerFunctions;
+    const toRemove = [];
+    
+    while (current) {
+      if (current.fn && current.fn.name === 'sizeMattersGridTicker') {
+        toRemove.push(current.fn);
+      }
+      current = current.next;
+    }
+    
+    toRemove.forEach(fn => canvas.app.ticker.remove(fn));
+  }
+}
+
 class SizeMattersApp extends Application {
   constructor(token, options = {}) {
     super(options);
@@ -32,7 +249,7 @@ class SizeMattersApp extends Application {
   }
 
   initializeHexGrid() {
-    const gridSize = 5;
+    const gridSize = 7;
     this.grid = {};
     for (let q = -gridSize; q <= gridSize; q++) {
       for (let r = -gridSize; r <= gridSize; r++) {
@@ -66,7 +283,9 @@ class SizeMattersApp extends Application {
   }
 
   loadSettings() {
-    const settings = game.modules.get('size-matters')?.settings || {};
+    // Load settings from token flags instead of global module settings
+    const tokenSettings = this.token.document.getFlag('size-matters', 'settings') || {};
+    
     this.settings = foundry.utils.mergeObject({
       color: "#ff0000",
       fillColor: "#ff0000",
@@ -81,18 +300,16 @@ class SizeMattersApp extends Application {
       grid: this.grid,
       imageVisible: true,
       gridVisible: true
-    }, settings);
+    }, tokenSettings);
     
-    if (settings.grid) {
-      this.grid = foundry.utils.mergeObject(this.grid, settings.grid);
+    if (tokenSettings.grid) {
+      this.grid = foundry.utils.mergeObject(this.grid, tokenSettings.grid);
     }
   }
 
-  saveSettings() {
-    if (!game.modules.get('size-matters')) {
-      game.modules.set('size-matters', { settings: {} });
-    }
-    game.modules.get('size-matters').settings = foundry.utils.duplicate(this.settings);
+  async saveSettings() {
+    // Save settings to token flags instead of global module settings
+    await this.token.document.setFlag('size-matters', 'settings', foundry.utils.duplicate(this.settings));
   }
 
   getData() {
@@ -111,16 +328,6 @@ class SizeMattersApp extends Application {
     };
   }
 
-  axialToPixel(q, r, radius, pointy) {
-    return pointy
-      ? { x: radius * Math.sqrt(3) * (q + r / 2), y: radius * 1.5 * r }
-      : { x: radius * 1.5 * q, y: radius * Math.sqrt(3) * (r + q / 2) };
-  }
-
-  squareToPixel(x, y, size) {
-    return { x: x * size, y: y * size };
-  }
-
   createGridSVG(isHexGrid, isPointyTop) {
     const svgSize = 500;
     return isHexGrid ? this.createHexSVG(isPointyTop, svgSize) : this.createSquareSVG(svgSize);
@@ -131,7 +338,7 @@ class SizeMattersApp extends Application {
     let svg = `<svg width="${svgSize}" height="${svgSize}" viewBox="0 0 ${svgSize} ${svgSize}">`;
     
     Object.entries(this.grid).forEach(([key, h]) => {
-      const pos = this.axialToPixel(h.q, h.r, svgRadius, isPointyTop);
+      const pos = axialToPixel(h.q, h.r, svgRadius, isPointyTop);
       const cx = svgSize / 2 + pos.x;
       const cy = svgSize / 2 + pos.y;
       let pts = [];
@@ -161,7 +368,7 @@ class SizeMattersApp extends Application {
     let svg = `<svg width="${svgSize}" height="${svgSize}" viewBox="0 0 ${svgSize} ${svgSize}">`;
     
     Object.entries(this.grid).forEach(([key, square]) => {
-      const pos = this.squareToPixel(square.q, square.r, squareSize);
+      const pos = squareToPixel(square.q, square.r, squareSize);
       const cx = svgSize / 2 + pos.x - squareSize / 2;
       const cy = svgSize / 2 + pos.y - squareSize / 2;
       
@@ -312,118 +519,24 @@ class SizeMattersApp extends Application {
       return ui.notifications.warn("Select at least one cell!");
     }
 
-    this.clearGraphics();
+    // Update settings and save to token flags
+    this.settings.grid = this.grid;
+    await this.saveSettings();
 
-    const gridType = canvas.grid.type;
-    const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
-                       CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-    const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
-    const size = canvas.grid.size;
+    // Use the global function to draw graphics
+    await drawSizeMattersGraphicsForToken(this.token);
 
-    const color = parseInt(this.settings.color.replace('#', '0x'));
-    const fillColor = parseInt(this.settings.fillColor.replace('#', '0x'));
-
-    this._gridGraphics = new PIXI.Graphics();
-    this._gridGraphics.interactive = false;
-    this._gridGraphics.interactiveChildren = false;
-    
-    if (this.settings.enableContour) {
-      this._gridGraphics.lineStyle(this.settings.thickness, color, this.settings.alpha);
-    }
-
-    selectedCells.forEach(cell => {
-      if (isHexGrid) {
-        const hexRadius = size / Math.sqrt(3);
-        const offset = this.axialToPixel(cell.q, cell.r, hexRadius, isPointyTop);
-        if (this.settings.enableFill) {
-          this._gridGraphics.beginFill(fillColor, this.settings.alpha);
-        }
-        this.drawHex(this._gridGraphics, offset.x, offset.y, hexRadius, isPointyTop);
-        if (this.settings.enableFill) {
-          this._gridGraphics.endFill();
-        }
-      } else {
-        const offset = this.squareToPixel(cell.q, cell.r, size);
-        if (this.settings.enableFill) {
-          this._gridGraphics.beginFill(fillColor, this.settings.alpha);
-        }
-        this.drawSquare(this._gridGraphics, offset.x - size/2, offset.y - size/2, size);
-        if (this.settings.enableFill) {
-          this._gridGraphics.endFill();
-        }
-      }
-    });
-
-    this._gridGraphics.visible = this.settings.gridVisible;
-    canvas.tokens.addChildAt(this._gridGraphics, 0);
-
-    this._imageSprite = null;
-    if (this.settings.imageUrl && this.settings.imageUrl.trim() && this.settings.imageVisible) {
-      try {
-        const texture = await PIXI.Texture.fromURL(this.settings.imageUrl);
-        this._imageSprite = new PIXI.Sprite(texture);
-        this._imageSprite.anchor.set(0.5, 0.5);
-        this._imageSprite.scale.set(this.settings.imageScale);
-        this._imageSprite.visible = this.settings.imageVisible;
-        canvas.tokens.addChildAt(this._imageSprite, 1);
-      } catch (error) {
-        ui.notifications.warn("Failed to load image. Please check the path.");
-      }
-    }
-
-    this._gridTicker = () => {
-      const currentToken = canvas.tokens.get(this.tokenId);
-      if (!currentToken || !currentToken.document) return;
-      
-      const centerX = currentToken.center.x;
-      const centerY = currentToken.center.y;
-      const rotation = Math.toRadians(currentToken.document.rotation || 0);
-      
-      if (this._gridGraphics) {
-        this._gridGraphics.position.set(centerX, centerY);
-        this._gridGraphics.rotation = rotation;
-      }
-      
-      if (this._imageSprite) {
-        let offsetX = this.settings.imageOffsetX;
-        let offsetY = this.settings.imageOffsetY;
-        
-        if (rotation !== 0) {
-          const cos = Math.cos(rotation);
-          const sin = Math.sin(rotation);
-          const rotatedX = offsetX * cos - offsetY * sin;
-          const rotatedY = offsetX * sin + offsetY * cos;
-          offsetX = rotatedX;
-          offsetY = rotatedY;
-        }
-        
-        this._imageSprite.position.set(centerX + offsetX, centerY + offsetY);
-        this._imageSprite.rotation = rotation;
-        this._imageSprite.scale.set(this.settings.imageScale);
-      }
-    };
-    canvas.app.ticker.add(this._gridTicker);
-
-    this.saveSettings();
-  }
-
-  drawHex(g, cx, cy, r, pointy) {
-    const startAngle = pointy ? -Math.PI / 2 : 0;
-    g.moveTo(cx + r * Math.cos(startAngle), cy + r * Math.sin(startAngle));
-    for (let i = 1; i <= 6; i++) {
-      const angle = startAngle + i * Math.PI / 3;
-      g.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-    }
-  }
-
-  drawSquare(g, x, y, size) {
-    g.drawRect(x, y, size, size);
+    // Store references for easy access
+    this._gridGraphics = this.token.sizeMattersGrid;
+    this._imageSprite = this.token.sizeMattersImage;
+    this._gridTicker = this.token.sizeMattersGridTicker;
   }
 
   toggleImageVisibility() {
-    if (this._imageSprite) {
-      this._imageSprite.visible = !this._imageSprite.visible;
-      this.settings.imageVisible = this._imageSprite.visible;
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersImage) {
+      currentToken.sizeMattersImage.visible = !currentToken.sizeMattersImage.visible;
+      this.settings.imageVisible = currentToken.sizeMattersImage.visible;
       this.saveSettings();
     } else {
       ui.notifications.warn("No image has been loaded!");
@@ -431,36 +544,36 @@ class SizeMattersApp extends Application {
   }
 
   toggleGridVisibility() {
-    if (this._gridGraphics) {
-      this._gridGraphics.visible = !this._gridGraphics.visible;
-      this.settings.gridVisible = this._gridGraphics.visible;
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersGrid) {
+      currentToken.sizeMattersGrid.visible = !currentToken.sizeMattersGrid.visible;
+      this.settings.gridVisible = currentToken.sizeMattersGrid.visible;
       this.saveSettings();
     } else {
       ui.notifications.warn("No grid has been drawn!");
     }
   }
 
-  clearGraphics() {
-    if (this._gridGraphics) {
-      canvas.tokens.removeChild(this._gridGraphics);
-      this._gridGraphics.destroy();
-      this._gridGraphics = null;
-    }
-    
-    if (this._imageSprite) {
-      canvas.tokens.removeChild(this._imageSprite);
-      this._imageSprite.destroy();
-      this._imageSprite = null;
-    }
-    
-    if (this._gridTicker) {
-      canvas.app.ticker.remove(this._gridTicker);
-      this._gridTicker = null;
-    }
+  clearTokenGraphics() {
+    const currentToken = canvas.tokens.get(this.tokenId);
+    clearTokenSizeMattersGraphics(currentToken);
+
+    // Clear references
+    this._gridGraphics = null;
+    this._imageSprite = null;
+    this._gridTicker = null;
   }
 
-  clearAll(html) {
-    this.clearGraphics();
+  clearGraphics() {
+    // This method now only clears references, doesn't remove from canvas
+    this._gridGraphics = null;
+    this._imageSprite = null;
+    this._gridTicker = null;
+  }
+
+  async clearAll(html) {
+    // Clear graphics from canvas
+    this.clearTokenGraphics();
     
     this.initializeGrid();
     
@@ -480,9 +593,8 @@ class SizeMattersApp extends Application {
       gridVisible: true
     };
 
-    if (game.modules.get('size-matters')) {
-      game.modules.get('size-matters').settings = {};
-    }
+    // Remove settings from token flags
+    await this.token.document.unsetFlag('size-matters', 'settings');
 
     if (html) {
       html.find('[name="color"]').val("#ff0000");
@@ -519,42 +631,89 @@ class SizeMattersApp extends Application {
   }
 
   async close(options = {}) {
+    // Only clear references, don't remove graphics from canvas
     this.clearGraphics();
-    this.saveSettings();
+    await this.saveSettings();
     return super.close(options);
   }
 }
 
+// Define openSizeMatters function immediately when script loads
+window.openSizeMatters = function() {
+  // Check if Foundry VTT is ready
+  if (!canvas || !canvas.tokens || !ui || !ui.notifications) {
+    console.warn("Size Matters: Foundry VTT not ready yet. Please try again in a moment.");
+    return;
+  }
+
+  if (!canvas.tokens.controlled.length) {
+    return ui.notifications.warn("Select a token first.");
+  }
+
+  const token = canvas.tokens.controlled[0];
+  const gridType = canvas.grid.type;
+  const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
+                     CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
+  const isSquareGrid = gridType === CONST.GRID_TYPES.SQUARE;
+  
+  if (!isHexGrid && !isSquareGrid) {
+    return ui.notifications.warn("This module works with hexagonal and square grids only!");
+  }
+
+  const app = new SizeMattersApp(token);
+  app.render(true);
+};
+
 Hooks.once('ready', () => {
-  window.openSizeMatters = function() {
-    if (!canvas.tokens.controlled.length) {
-      return ui.notifications.warn("Select a token first.");
-    }
+  console.log("Size Matters: Module ready and openSizeMatters function available globally");
+});
 
-    const token = canvas.tokens.controlled[0];
-    const gridType = canvas.grid.type;
-    const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, 
-                       CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-    const isSquareGrid = gridType === CONST.GRID_TYPES.SQUARE;
+// Hook to clear all graphics before scene changes
+Hooks.on('canvasInit', () => {
+  console.log("Size Matters: Canvas initializing, clearing all graphics");
+  clearAllSizeMattersGraphics();
+});
+
+// Hook to recreate graphics when tokens are rendered (after page reload)
+Hooks.on('canvasReady', async () => {
+  // Wait a bit for canvas to be fully ready
+  setTimeout(async () => {
+    console.log("Size Matters: Canvas ready, checking for tokens with saved graphics...");
     
-    if (!isHexGrid && !isSquareGrid) {
-      return ui.notifications.warn("This module works with hexagonal and square grids only!");
-    }
-
-    const currentToken = canvas.tokens.get(token.id);
-    if (currentToken && currentToken.sizeMattersHighlight) {
-      canvas.tokens.removeChild(currentToken.sizeMattersHighlight);
-      currentToken.sizeMattersHighlight.destroy();
-      currentToken.sizeMattersHighlight = null;
-      if (currentToken._gridTicker) {
-        canvas.app.ticker.remove(currentToken._gridTicker);
-        currentToken._gridTicker = null;
+    // Check all tokens on the canvas for saved Size Matters settings
+    for (const token of canvas.tokens.placeables) {
+      const settings = token.document.getFlag('size-matters', 'settings');
+      if (settings && settings.grid) {
+        console.log(`Size Matters: Restoring graphics for token ${token.id}`);
+        await drawSizeMattersGraphicsForToken(token);
       }
     }
+  }, 500);
+});
 
-    const app = new SizeMattersApp(token);
-    app.render(true);
-  };
+// Additional hook for when individual tokens are rendered
+Hooks.on('renderToken', async (token) => {
+  // Small delay to ensure token is fully rendered
+  setTimeout(async () => {
+    const settings = token.document.getFlag('size-matters', 'settings');
+    if (settings && settings.grid && !token.sizeMattersGrid) {
+      console.log(`Size Matters: Restoring graphics for rendered token ${token.id}`);
+      await drawSizeMattersGraphicsForToken(token);
+    }
+  }, 100);
+});
+
+// Hook to clean up graphics when tokens are deleted
+Hooks.on('deleteToken', (token) => {
+  clearTokenSizeMattersGraphics(token);
+});
+
+// Hook to clear graphics when scene changes
+Hooks.on('updateScene', (scene, changes) => {
+  if (changes.active === true) {
+    console.log("Size Matters: Scene changing, clearing all graphics from previous scene");
+    clearAllSizeMattersGraphics();
+  }
 });
 
 export { SizeMattersApp };
