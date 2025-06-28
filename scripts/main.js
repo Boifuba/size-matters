@@ -319,7 +319,7 @@ class SizeMattersApp extends Application {
 
   async savePreset(name, settings) {
     const presets = await this.getPresets();
-    // Don't save the grid selection in presets, only appearance settings
+    // FIXED: Now save EVERYTHING including grid selection
     const presetData = {
       color: settings.color,
       fillColor: settings.fillColor,
@@ -332,7 +332,8 @@ class SizeMattersApp extends Application {
       imageOffsetX: settings.imageOffsetX,
       imageOffsetY: settings.imageOffsetY,
       imageVisible: settings.imageVisible,
-      gridVisible: settings.gridVisible
+      gridVisible: settings.gridVisible,
+      grid: foundry.utils.duplicate(settings.grid) // CRITICAL: Save grid selection too!
     };
     presets[name] = presetData;
     await game.settings.set('size-matters', 'presets', presets);
@@ -348,8 +349,15 @@ class SizeMattersApp extends Application {
     const presets = await this.getPresets();
     const preset = presets[name];
     if (preset) {
-      // Merge preset with current settings, keeping the current grid selection
+      // FIXED: Load everything including grid selection
       this.settings = foundry.utils.mergeObject(this.settings, preset);
+      
+      // CRITICAL: Update the grid object with the loaded grid selection
+      if (preset.grid) {
+        this.grid = foundry.utils.duplicate(preset.grid);
+        this.settings.grid = this.grid;
+      }
+      
       await this.saveSettings();
       return true;
     }
@@ -565,6 +573,7 @@ class SizeMattersApp extends Application {
     const loaded = await this.loadPreset(name);
     if (loaded) {
       this.updateFormFromSettings(html);
+      this.updateGridSVG(html); // CRITICAL: Update the grid visual too!
       this.drawGrid(html);
       ui.notifications.info(`Preset "${name}" loaded!`);
     } else {
