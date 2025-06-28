@@ -1,6 +1,6 @@
 # Size Matters
 
-A comprehensive FoundryVTT module that allows you to create customizable highlights around tokens on both **hexagonal and square grids**, with optional image overlays and preset management.
+A comprehensive FoundryVTT module that allows you to create customizable highlights around tokens on both **hexagonal and square grids**, with optional image overlays, rotation controls, and preset management system.
 
 ## Features
 
@@ -11,27 +11,32 @@ A comprehensive FoundryVTT module that allows you to create customizable highlig
 - **Token Synchronization**: Highlights automatically follow token movement and rotation
 - **Multi-user Synchronization**: Changes are instantly visible to all connected users
 
+### Advanced Image Controls
+- **Image Overlay System**: Add custom images that follow and rotate with tokens
+- **Scale Control**: Real-time scale adjustment (0.1x to 3.0x)
+- **Position Control**: Precise X/Y positioning with sliders (-200 to +200 pixels)
+- **Rotation Control**: Independent image rotation (-180° to +180°) that combines with token rotation
+- **Visibility Toggle**: Show/hide images without losing settings
+
 ### Customization Options
 - **Appearance Controls**: 
   - Outline and fill colors with color picker
   - Adjustable thickness (1-10) and opacity (0.1-1.0)
   - Enable/disable fill and outline independently
-- **Image Overlay System**: 
-  - Add custom images that follow the token
-  - Real-time scale adjustment (0.1x to 3.0x)
-  - Precise positioning with X/Y offset sliders (-200 to +200 pixels)
-- **Visibility Controls**: Toggle image and grid highlights independently
+- **Grid Visibility**: Toggle grid highlights independently from images
 
-### Preset Management
-- **Save Configurations**: Save your current settings as named presets
+### Preset Management System
+- **Save Configurations**: Save your current settings (including grid selection) as named presets
 - **Quick Loading**: Instantly apply saved presets to any token
 - **Preset Library**: Manage multiple presets for different scenarios
 - **Easy Deletion**: Remove unwanted presets with confirmation dialog
+- **Complete Settings**: Presets save ALL settings including grid selection, colors, image settings, and rotation
 
-### Accessibility
+### Accessibility Features
 - **Chat Command**: Use `/size-matters` in chat to open the module
 - **Macro Support**: Create macro buttons for quick access
-- **Persistent Settings**: Your configuration is saved and restored between sessions
+- **Persistent Settings**: Your configuration is saved per token and restored between sessions
+- **Compact Interface**: Streamlined UI with efficient space usage
 
 ## Installation
 
@@ -77,41 +82,55 @@ Simply type `/size-matters` in the chat to open the Size Matters dialog. This co
 ### Preset Management
 
 #### Saving Presets
-1. Configure your desired settings (colors, thickness, opacity, image, etc.)
+1. Configure your desired settings (grid selection, colors, thickness, opacity, image, rotation, etc.)
 2. Enter a name in the "Enter preset name..." field
-3. Click **Save Current** to save the current configuration
+3. Click the **Save** button (💾 icon) to save the current configuration
 4. The preset will be available in the dropdown for future use
 
 #### Loading Presets
 1. Select a preset from the dropdown menu
-2. Click **Load** to apply the preset settings
-3. The current grid selection is preserved when loading presets
-4. All appearance settings will be updated immediately
+2. Click the **Load** button (📁 icon) to apply the preset settings
+3. **All settings are restored**: grid selection, colors, image settings, rotation, etc.
+4. Changes are applied immediately with visual feedback
 
 #### Deleting Presets
 1. Select the preset you want to delete from the dropdown
-2. Click **Delete** 
+2. Click the **Delete** button (🗑️ icon)
 3. Confirm the deletion in the dialog that appears
 4. The preset will be permanently removed
 
-### Image Settings
-- **Browse Image**: Select an image file to overlay on the highlight
+### Image Controls
+
+#### Basic Image Setup
+- **Browse Image**: Click "Browse Image" to select an image file to overlay
+- **Supported Formats**: PNG, JPG, WEBP, SVG
+- **Auto-visibility**: Images are automatically shown when loaded
+
+#### Advanced Image Controls
 - **Scale**: Adjust image size from 0.1x to 3.0x with real-time preview
-- **X/Y Position**: Fine-tune image positioning with sliders (-200 to +200 pixels)
-- **Rotation**: Images automatically rotate with the token
+- **X Position**: Fine-tune horizontal positioning (-200 to +200 pixels)
+- **Y Position**: Fine-tune vertical positioning (-200 to +200 pixels)
+- **Rotation**: Independent image rotation (-180° to +180°)
+- **Combined Rotation**: Image rotation combines with token rotation for realistic movement
+
+#### Image Visibility
+- **Toggle Image**: Use the "Image" button to show/hide the image overlay
+- **Persistent Settings**: Visibility state is saved and restored
+- **Non-destructive**: Hiding an image doesn't remove it, just toggles visibility
 
 ### Appearance Controls
-- **Outline Color**: Color of the cell borders
-- **Fill Color**: Color of the cell interiors  
-- **Thickness**: Border line thickness (1-10 pixels)
-- **Opacity**: Transparency level (0.1-1.0)
-- **Enable Fill/Outline**: Toggle fill and outline independently
+- **Outline Color**: Color of the cell borders with color picker
+- **Fill Color**: Color of the cell interiors with color picker
+- **Thickness**: Border line thickness (1-10 pixels) with real-time preview
+- **Opacity**: Transparency level (0.1-1.0) with real-time preview
+- **Enable Outline**: Toggle outline visibility independently
+- **Enable Fill**: Toggle fill visibility independently
 
 ### Action Buttons
 - **Draw**: Manually redraw the highlight (usually not needed due to auto-draw)
 - **Clear**: Remove all highlights and reset all settings to default
-- **Toggle Image**: Show/hide the image overlay
-- **Toggle Grid**: Show/hide the grid highlights
+- **Image**: Toggle image overlay visibility
+- **Grid**: Toggle grid highlight visibility
 
 ## Grid Support
 
@@ -155,28 +174,20 @@ openSizeMatters();
 - Optimized position tracking with change detection
 - Automatic cleanup when dialogs are closed
 - Efficient ticker management to prevent memory leaks
+- Real-time updates without performance impact
 
 ### Data Storage
 - **Token Settings**: Stored as flags on individual tokens
-- **Presets**: Stored as world-level game settings
+- **Presets**: Stored as world-level game settings (GM only)
 - **Synchronization**: Automatic updates across all connected users
+- **Persistence**: Settings survive page reloads and scene changes
 
-### File Structure
-```
-size-matters/
-├── src/
-│   ├── main.js              # Main entry point and initialization
-│   ├── app.js               # SizeMattersApp class and UI logic
-│   ├── graphics.js          # PIXI graphics rendering functions
-│   ├── utils.js             # Utility functions and validation
-│   ├── hooks.js             # Foundry VTT hooks and event handlers
-│   └── constants.js         # Configuration constants
-├── styles/
-│   └── size-matters.css     # FoundryVTT native styling
-├── templates/
-│   └── size-matters-dialog.html  # UI template
-└── module.json              # Module manifest
-```
+### Advanced Features
+- **Multi-user Support**: Changes are synchronized across all connected users
+- **Token Following**: Graphics automatically follow token movement and rotation
+- **Image Rotation**: Independent image rotation that combines with token rotation
+- **Preset System**: Complete configuration management with save/load/delete
+- **Error Handling**: Robust error handling and validation throughout
 
 ## Troubleshooting
 
@@ -212,6 +223,11 @@ size-matters/
 - Check that the preset name doesn't contain special characters
 - Try refreshing and attempting again
 
+**Image rotation not working**
+- Ensure the image is properly loaded first
+- Check that the rotation slider is being moved
+- Image rotation combines with token rotation
+
 ### Performance Tips
 - Use appropriately sized images for better performance
 - Clear highlights when not needed to free up resources
@@ -234,20 +250,23 @@ We welcome contributions! Please feel free to:
 
 ### Development Setup
 1. Clone the repository
-2. The module uses ES6 modules with a modular architecture
+2. The module uses a single-file architecture for simplicity
 3. Test changes in a development Foundry instance
 4. Follow the existing code style and patterns
 
 ## Changelog
 
 ### Version 0.0.6
-- Complete code refactoring with modular architecture
-- Added preset management system (save/load/delete configurations)
-- Implemented `/size-matters` chat command
-- Enhanced multi-user synchronization
-- Improved error handling and validation
-- Better performance optimizations
-- Updated UI with preset management controls
+- **NEW**: Complete preset management system (save/load/delete configurations)
+- **NEW**: Image rotation control (-180° to +180°) with token rotation combination
+- **NEW**: `/size-matters` chat command for easy access
+- **NEW**: Enhanced multi-user synchronization
+- **IMPROVED**: Streamlined UI with compact design and neutral button styling
+- **IMPROVED**: Better error handling and validation throughout
+- **IMPROVED**: Performance optimizations and memory management
+- **IMPROVED**: Image visibility toggle now preserves image without removal
+- **FIXED**: Grid selection now properly saved and restored in presets
+- **FIXED**: Image settings properly synchronized across all users
 
 ### Previous Versions
 - See [releases page](https://github.com/Boifuba/size-matters/releases) for full changelog
@@ -265,3 +284,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Size Matters** - Because sometimes, size really does matter! 🎯
+
+*A powerful, feature-rich grid highlighting tool for FoundryVTT with advanced image controls and preset management.*
