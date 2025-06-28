@@ -79,13 +79,14 @@ async function drawSizeMattersGraphicsForToken(token) {
   token.sizeMattersGrid.visible = settings.gridVisible !== false;
   canvas.tokens.addChildAt(token.sizeMattersGrid, 0);
 
-  // Handle image sprite
-  if (settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible !== false) {
+  // Handle image sprite - ALWAYS create if imageUrl exists, just control visibility
+  if (settings.imageUrl && settings.imageUrl.trim()) {
     try {
       const texture = await PIXI.Texture.fromURL(settings.imageUrl);
       token.sizeMattersImage = new PIXI.Sprite(texture);
       token.sizeMattersImage.anchor.set(0.5, 0.5);
       token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+      // CRITICAL: Set visibility based on imageVisible setting
       token.sizeMattersImage.visible = settings.imageVisible !== false;
       canvas.tokens.addChildAt(token.sizeMattersImage, 1);
     } catch (error) {
@@ -683,12 +684,22 @@ class SizeMattersApp extends Application {
     this._gridTicker = this.token.sizeMattersGridTicker;
   }
 
+  // FIXED: Toggle image visibility properly - just show/hide, don't remove
   toggleImageVisibility() {
     const currentToken = canvas.tokens.get(this.tokenId);
+    
+    // Toggle the imageVisible setting
+    this.settings.imageVisible = !this.settings.imageVisible;
+    this.saveSettings();
+    
+    // If we have an image sprite, just toggle its visibility
     if (currentToken && currentToken.sizeMattersImage) {
-      currentToken.sizeMattersImage.visible = !currentToken.sizeMattersImage.visible;
-      this.settings.imageVisible = currentToken.sizeMattersImage.visible;
-      this.saveSettings();
+      currentToken.sizeMattersImage.visible = this.settings.imageVisible;
+      ui.notifications.info(`Image ${this.settings.imageVisible ? 'shown' : 'hidden'}`);
+    } else if (this.settings.imageUrl && this.settings.imageUrl.trim()) {
+      // If we have an imageUrl but no sprite, redraw to create it
+      this.drawGrid();
+      ui.notifications.info(`Image ${this.settings.imageVisible ? 'shown' : 'hidden'}`);
     } else {
       ui.notifications.warn("No image has been loaded!");
     }
@@ -696,10 +707,14 @@ class SizeMattersApp extends Application {
 
   toggleGridVisibility() {
     const currentToken = canvas.tokens.get(this.tokenId);
+    
+    // Toggle the gridVisible setting
+    this.settings.gridVisible = !this.settings.gridVisible;
+    this.saveSettings();
+    
     if (currentToken && currentToken.sizeMattersGrid) {
-      currentToken.sizeMattersGrid.visible = !currentToken.sizeMattersGrid.visible;
-      this.settings.gridVisible = currentToken.sizeMattersGrid.visible;
-      this.saveSettings();
+      currentToken.sizeMattersGrid.visible = this.settings.gridVisible;
+      ui.notifications.info(`Grid ${this.settings.gridVisible ? 'shown' : 'hidden'}`);
     } else {
       ui.notifications.warn("No grid has been drawn!");
     }
