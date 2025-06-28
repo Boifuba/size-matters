@@ -10,7 +10,7 @@
       "flags": {}
     }
   ],
-  "version": "0.0.6",
+  "version": "1.0.0",
   "compatibility": {
     "minimum": "11",
     "verified": "13",
@@ -30,8 +30,8 @@
     }
   ],
   "url": "https://github.com/Boifuba/size-matters",
-  "manifest": "https://github.com/Boifuba/size-matters/releases/download/0.0.6/module.json",
-  "download": "https://github.com/Boifuba/size-matters/releases/download/0.0.6/size-matters.zip",
+  "manifest": "https://github.com/Boifuba/size-matters/releases/download/packs/module.json",
+  "download": "https://github.com/Boifuba/size-matters/releases/download/packs/size-matters.zip",
   "esmodules": [
     "scripts/main.js"
   ],
