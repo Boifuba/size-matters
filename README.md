@@ -28,7 +28,7 @@ A FoundryVTT module that allows you to create customizable highlights around tok
 
 ### Manifest URL
 ```
-[Add your manifest URL here when publishing]
+https://github.com/Boifuba/size-matters/releases/download/0.0.2/module.json
 ```
 
 ## Usage
