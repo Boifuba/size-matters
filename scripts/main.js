@@ -716,4 +716,34 @@ Hooks.on('updateScene', (scene, changes) => {
   }
 });
 
+// CRITICAL: Hook to synchronize image updates across all users
+Hooks.on('updateToken', async (tokenDocument, changes, options, userId) => {
+  try {
+    // Check if Size Matters settings were updated
+    if (changes.flags && changes.flags['size-matters']) {
+      console.log(`Size Matters: Token ${tokenDocument.id} settings updated, redrawing graphics for all users`);
+      
+      // Get the actual token object from the canvas
+      const token = canvas.tokens.get(tokenDocument.id);
+      if (!token) {
+        console.warn(`Size Matters: Could not find token ${tokenDocument.id} on canvas`);
+        return;
+      }
+      
+      // Small delay to ensure the flag update is fully processed
+      setTimeout(async () => {
+        // Clear existing graphics first
+        clearTokenSizeMattersGraphics(token);
+        
+        // Redraw with new settings
+        await drawSizeMattersGraphicsForToken(token);
+        
+        console.log(`Size Matters: Graphics redrawn for token ${tokenDocument.id}`);
+      }, 50);
+    }
+  } catch (error) {
+    console.error("Size Matters: Error in updateToken hook", error);
+  }
+});
+
 export { SizeMattersApp };
