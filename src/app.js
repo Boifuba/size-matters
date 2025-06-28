@@ -75,12 +75,8 @@ export class SizeMattersApp extends Application {
         return;
       }
       
-      console.log("Size Matters: saveSettings() called for token", this.tokenId);
-      
-      // Save settings to token flags instead of global module settings
+      // Save settings to token flags
       await this.token.document.setFlag('size-matters', 'settings', foundry.utils.duplicate(this.settings));
-      
-      console.log("Size Matters: Settings saved successfully to token flags");
     } catch (error) {
       console.error("Size Matters: Error saving settings", error);
       ui.notifications?.error("Failed to save settings");
@@ -163,14 +159,17 @@ export class SizeMattersApp extends Application {
     super.activateListeners(html);
 
     try {
-      // Grid cell selection
+      // CRITICAL: Draw initial graphics when dialog opens
+      this.drawGrid(html);
+
+      // Grid cell selection with immediate update
       html.find('polygon[data-grid], rect[data-grid]').click((event) => {
         const key = event.currentTarget.getAttribute('data-grid');
         this.toggleGridCell(key, event.currentTarget);
-        this.drawGrid(html);
+        this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
-      // Real-time updates for all sliders and inputs
+      // Real-time updates for all sliders
       html.find('input[name="thickness"]').on('input', (event) => {
         html.find('#tval').text(event.target.value);
         this.updateSettingsFromForm(html);
@@ -201,7 +200,7 @@ export class SizeMattersApp extends Application {
         this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
-      // Color changes
+      // Color changes with immediate update
       html.find('input[name="color"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
         this.drawGrid(html); // IMMEDIATE UPDATE
@@ -212,7 +211,7 @@ export class SizeMattersApp extends Application {
         this.drawGrid(html); // IMMEDIATE UPDATE
       });
 
-      // Checkbox changes
+      // Checkbox changes with immediate update
       html.find('input[name="enableFill"]').on('change', (event) => {
         this.updateSettingsFromForm(html);
         this.drawGrid(html); // IMMEDIATE UPDATE
@@ -230,11 +229,6 @@ export class SizeMattersApp extends Application {
       html.find('.toggle-image-button').click(() => this.toggleImageVisibility());
       html.find('.toggle-grid-button').click(() => this.toggleGridVisibility());
 
-      // Save settings on any change
-      html.find('input').on('change', () => {
-        this.updateSettingsFromForm(html);
-        this.saveSettings();
-      });
     } catch (error) {
       console.error("Size Matters: Error activating listeners", error);
     }
@@ -249,7 +243,7 @@ export class SizeMattersApp extends Application {
           this.settings.imageUrl = path;
           this.settings.imageVisible = true;
           this.saveSettings();
-          this.drawGrid(html);
+          this.drawGrid(html); // IMMEDIATE UPDATE
         }
       });
       fp.render(true);
@@ -264,17 +258,12 @@ export class SizeMattersApp extends Application {
       const cell = this.grid[key];
       if (!cell || cell.isCenter) return;
       
-      console.log(`Size Matters: Toggling grid cell ${key}, current state: ${cell.selected}`);
-      
       cell.selected = !cell.selected;
       element.setAttribute("fill", cell.selected ? "#2196F3" : "#ffffff");
       element.classList.toggle('grid-selected', cell.selected);
       element.classList.toggle('grid-unselected', !cell.selected);
       
       this.settings.grid = this.grid;
-      
-      console.log(`Size Matters: Grid cell ${key} toggled to: ${cell.selected}`);
-      
       this.saveSettings();
     } catch (error) {
       console.error("Size Matters: Error toggling grid cell", error);
@@ -302,32 +291,26 @@ export class SizeMattersApp extends Application {
 
   async drawGrid(html) {
     try {
-      console.log("Size Matters: drawGrid() called");
-      
       this.updateSettingsFromForm(html);
       
       const selectedCells = Object.values(this.grid).filter(h => h.selected);
       if (!selectedCells.length) {
-        // Don't show warning for empty selection, just clear graphics
+        // Clear graphics if no cells selected
         clearTokenSizeMattersGraphics(this.token);
         return;
       }
-
-      console.log(`Size Matters: Drawing grid with ${selectedCells.length} selected cells`);
 
       // Update settings and save to token flags
       this.settings.grid = this.grid;
       await this.saveSettings();
 
-      // Use the global function to draw graphics
+      // Draw graphics immediately
       await drawSizeMattersGraphicsForToken(this.token);
 
       // Store references for easy access
       this._gridGraphics = this.token.sizeMattersGrid;
       this._imageSprite = this.token.sizeMattersImage;
       this._gridTicker = this.token.sizeMattersGridTicker;
-      
-      console.log("Size Matters: drawGrid() completed successfully");
     } catch (error) {
       console.error("Size Matters: Error drawing grid", error);
       ui.notifications?.error("Failed to draw grid");
