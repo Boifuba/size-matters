@@ -146,15 +146,6 @@ Feel free to submit issues, feature requests, or pull requests on the project re
 
 ## License
 
-[Add your license information here]
+MIT
 
-## Changelog
 
-### Version 1.0.0
-- Initial release with universal grid support
-- Interactive hex and square grid selection
-- Customizable colors and appearance
-- Image overlay system with real-time positioning
-- Token synchronization and movement tracking
-- Persistent settings and visibility controls
-- FoundryVTT native styling and UI
