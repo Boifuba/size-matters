@@ -123,20 +123,20 @@ async function drawSizeMattersGraphicsForToken(token) {
     try {
       const centerX = token.center.x;
       const centerY = token.center.y;
-      const rotation = Math.toRadians(token.document.rotation || 0);
+      const tokenRotation = Math.toRadians(token.document.rotation || 0);
       
       if (token.sizeMattersGrid && token.sizeMattersGrid.parent) {
         token.sizeMattersGrid.position.set(centerX, centerY);
-        token.sizeMattersGrid.rotation = rotation;
+        token.sizeMattersGrid.rotation = tokenRotation;
       }
       
       if (token.sizeMattersImage && token.sizeMattersImage.parent) {
         let offsetX = settings.imageOffsetX || 0;
         let offsetY = settings.imageOffsetY || 0;
         
-        if (rotation !== 0) {
-          const cos = Math.cos(rotation);
-          const sin = Math.sin(rotation);
+        if (tokenRotation !== 0) {
+          const cos = Math.cos(tokenRotation);
+          const sin = Math.sin(tokenRotation);
           const rotatedX = offsetX * cos - offsetY * sin;
           const rotatedY = offsetX * sin + offsetY * cos;
           offsetX = rotatedX;
@@ -144,7 +144,11 @@ async function drawSizeMattersGraphicsForToken(token) {
         }
         
         token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
-        token.sizeMattersImage.rotation = rotation;
+        
+        // CRITICAL: Apply both token rotation AND image rotation
+        const imageRotation = Math.toRadians(settings.imageRotation || 0);
+        token.sizeMattersImage.rotation = tokenRotation + imageRotation;
+        
         token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
       }
     } catch (error) {
@@ -298,6 +302,7 @@ class SizeMattersApp extends Application {
       imageScale: 1.0,
       imageOffsetX: 0,
       imageOffsetY: 0,
+      imageRotation: 0, // NEW: Image rotation setting
       grid: this.grid,
       imageVisible: true,
       gridVisible: true
@@ -332,6 +337,7 @@ class SizeMattersApp extends Application {
       imageScale: settings.imageScale,
       imageOffsetX: settings.imageOffsetX,
       imageOffsetY: settings.imageOffsetY,
+      imageRotation: settings.imageRotation, // NEW: Save image rotation
       imageVisible: settings.imageVisible,
       gridVisible: settings.gridVisible,
       grid: foundry.utils.duplicate(settings.grid) // CRITICAL: Save grid selection too!
@@ -502,6 +508,13 @@ class SizeMattersApp extends Application {
       this.drawGrid(html);
     });
 
+    // NEW: Image rotation slider with real-time update
+    html.find('input[name="imageRotation"]').on('input', (event) => {
+      html.find('#rval').text(event.target.value);
+      this.updateSettingsFromForm(html);
+      this.drawGrid(html);
+    });
+
     html.find('input[name="color"]').on('change', (event) => {
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
@@ -618,6 +631,9 @@ class SizeMattersApp extends Application {
     html.find('#xval').text(this.settings.imageOffsetX);
     html.find('[name="imageOffsetY"]').val(this.settings.imageOffsetY);
     html.find('#yval').text(this.settings.imageOffsetY);
+    // NEW: Update image rotation form field
+    html.find('[name="imageRotation"]').val(this.settings.imageRotation);
+    html.find('#rval').text(this.settings.imageRotation);
   }
 
   async openFilePicker(html) {
@@ -659,6 +675,8 @@ class SizeMattersApp extends Application {
     this.settings.imageScale = parseFloat(html.find('[name="imageScale"]').val()) || 1.0;
     this.settings.imageOffsetX = parseInt(html.find('[name="imageOffsetX"]').val()) || 0;
     this.settings.imageOffsetY = parseInt(html.find('[name="imageOffsetY"]').val()) || 0;
+    // NEW: Update image rotation setting
+    this.settings.imageRotation = parseInt(html.find('[name="imageRotation"]').val()) || 0;
     this.settings.grid = this.grid;
   }
 
@@ -755,6 +773,7 @@ class SizeMattersApp extends Application {
       imageScale: 1.0,
       imageOffsetX: 0,
       imageOffsetY: 0,
+      imageRotation: 0, // NEW: Reset image rotation
       grid: this.grid,
       imageVisible: true,
       gridVisible: true
