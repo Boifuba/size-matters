@@ -57,9 +57,9 @@
 .save-preset-button, .load-preset-button, .delete-preset-button {
   width: 28px;
   height: 28px;
-  border: 1px solid #8b8b5a;
+  border: 1px solid #666;
   border-radius: 3px;
-  background: linear-gradient(135deg, #8b8b5a, #6b6b3a);
+  background: #444;
   color: white;
   cursor: pointer;
   font-size: 12px;
@@ -70,7 +70,7 @@
 }
 
 .save-preset-button:hover, .load-preset-button:hover, .delete-preset-button:hover {
-  background: linear-gradient(135deg, #6b6b3a, #5a5a2a);
+  background: #555;
   transform: translateY(-1px);
 }
 
@@ -153,23 +153,27 @@
 .file-picker-button {
   width: 100%;
   padding: 6px 8px;
-  border: 1px solid #8b8b5a;
+  border: 1px solid #666;
   border-radius: 3px;
-  background: linear-gradient(135deg, #8b8b5a, #6b6b3a);
+  background: #444;
   color: white;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 11px;
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .file-picker-button:hover {
-  background: linear-gradient(135deg, #6b6b3a, #5a5a2a);
+  background: #555;
   transform: translateY(-1px);
 }
 
-/* Action Buttons */
+/* Action Buttons - Neutral styling */
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -178,8 +182,10 @@
 
 .action-btn {
   padding: 6px 8px;
-  border: none;
+  border: 1px solid #666;
   border-radius: 3px;
+  background: #444;
+  color: white;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -190,44 +196,14 @@
   gap: 4px;
 }
 
-.draw-button {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  color: white;
-}
-
-.draw-button:hover {
-  background: linear-gradient(135deg, #45a049, #3d8b40);
+.action-btn:hover {
+  background: #555;
   transform: translateY(-1px);
 }
 
-.clear-button {
-  background: linear-gradient(135deg, #f44336, #d32f2f);
-  color: white;
-}
-
-.clear-button:hover {
-  background: linear-gradient(135deg, #d32f2f, #b71c1c);
-  transform: translateY(-1px);
-}
-
-.toggle-image-button {
-  background: linear-gradient(135deg, #FF9800, #F57C00);
-  color: white;
-}
-
-.toggle-image-button:hover {
-  background: linear-gradient(135deg, #F57C00, #E65100);
-  transform: translateY(-1px);
-}
-
-.toggle-grid-button {
-  background: linear-gradient(135deg, #9C27B0, #7B1FA2);
-  color: white;
-}
-
-.toggle-grid-button:hover {
-  background: linear-gradient(135deg, #7B1FA2, #4A148C);
-  transform: translateY(-1px);
+/* Remove specific button color overrides - all buttons now use neutral styling */
+.draw-button, .clear-button, .toggle-image-button, .toggle-grid-button {
+  /* Inherit from .action-btn - no color overrides */
 }
 
 /* Grid Interaction */

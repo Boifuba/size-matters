@@ -8,20 +8,28 @@
   <div class="preset-section">
     <div class="preset-row">
       <input type="text" id="preset-name" placeholder="Enter preset name..." class="preset-input">
-      <button type="button" class="save-preset-button">💾</button>
+      <button type="button" class="save-preset-button">
+        <i class="fas fa-save"></i>
+      </button>
     </div>
     <div class="preset-row">
       <select id="preset-select" class="preset-select">
         <option value="">Select preset...</option>
       </select>
-      <button type="button" class="load-preset-button">📂</button>
-      <button type="button" class="delete-preset-button">🗑️</button>
+      <button type="button" class="load-preset-button">
+        <i class="fas fa-folder-open"></i>
+      </button>
+      <button type="button" class="delete-preset-button">
+        <i class="fas fa-trash"></i>
+      </button>
     </div>
   </div>
 
   <!-- Image Controls -->
   <div class="section">
-    <button type="button" class="file-picker-button">📁 Browse Image</button>
+    <button type="button" class="file-picker-button">
+      <i class="fas fa-folder-open"></i> Browse Image
+    </button>
     <div class="control-row">
       <label>Scale:</label>
       <input type="range" class="slider" name="imageScale" min="0.1" max="3.0" step="0.1" value="{{imageScale}}">
@@ -61,9 +69,17 @@
 
   <!-- Action Buttons -->
   <div class="actions">
-    <button type="button" class="action-btn draw-button">🎨 Draw</button>
-    <button type="button" class="action-btn clear-button">🧹 Clear</button>
-    <button type="button" class="action-btn toggle-image-button">🖼️ Image</button>
-    <button type="button" class="action-btn toggle-grid-button">⬜ Grid</button>
+    <button type="button" class="action-btn draw-button">
+      <i class="fas fa-paint-brush"></i> Draw
+    </button>
+    <button type="button" class="action-btn clear-button">
+      <i class="fas fa-eraser"></i> Clear
+    </button>
+    <button type="button" class="action-btn toggle-image-button">
+      <i class="fas fa-image"></i> Image
+    </button>
+    <button type="button" class="action-btn toggle-grid-button">
+      <i class="fas fa-th-large"></i> Grid
+    </button>
   </div>
 </form>
