@@ -26,11 +26,21 @@ export async function drawSizeMattersGraphicsForToken(token) {
   }
 
   try {
+    console.log(`Size Matters: Starting drawSizeMattersGraphicsForToken for token ${token.id}`);
+    
     const settings = token.document.getFlag('size-matters', 'settings');
-    if (!settings || !settings.grid) return;
+    if (!settings || !settings.grid) {
+      console.log("Size Matters: No settings or grid found for token");
+      return;
+    }
 
     const selectedCells = Object.values(settings.grid).filter(h => h.selected);
-    if (!selectedCells.length) return;
+    if (!selectedCells.length) {
+      console.log("Size Matters: No selected cells found");
+      return;
+    }
+
+    console.log(`Size Matters: Found ${selectedCells.length} selected cells`);
 
     // Clear existing graphics for this token
     clearTokenSizeMattersGraphics(token);
@@ -42,6 +52,8 @@ export async function drawSizeMattersGraphicsForToken(token) {
 
     const color = parseInt(settings.color.replace('#', '0x'));
     const fillColor = parseInt(settings.fillColor.replace('#', '0x'));
+
+    console.log(`Size Matters: Creating graphics - isHex: ${isHex}, isPointy: ${isPointy}, size: ${size}`);
 
     // Create new graphics and attach to token
     token.sizeMattersGrid = new PIXI.Graphics();
@@ -81,16 +93,20 @@ export async function drawSizeMattersGraphicsForToken(token) {
 
     token.sizeMattersGrid.visible = settings.gridVisible !== false;
     canvas.tokens.addChildAt(token.sizeMattersGrid, 0);
+    
+    console.log("Size Matters: Grid graphics created and added to canvas");
 
     // Handle image sprite with better error handling
     if (settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible !== false) {
       try {
+        console.log(`Size Matters: Loading image: ${settings.imageUrl}`);
         const texture = await PIXI.Texture.fromURL(settings.imageUrl);
         token.sizeMattersImage = new PIXI.Sprite(texture);
         token.sizeMattersImage.anchor.set(0.5, 0.5);
         token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
         token.sizeMattersImage.visible = settings.imageVisible !== false;
         canvas.tokens.addChildAt(token.sizeMattersImage, 1);
+        console.log("Size Matters: Image sprite created and added to canvas");
       } catch (error) {
         console.warn("Size Matters: Failed to load image for token", token.id, error);
         ui.notifications?.warn(`Failed to load image: ${settings.imageUrl}`);
@@ -154,6 +170,8 @@ export async function drawSizeMattersGraphicsForToken(token) {
     };
 
     addTokenTicker(token, tickerFunction);
+    
+    console.log(`Size Matters: Graphics creation completed for token ${token.id}`);
 
   } catch (error) {
     console.error("Size Matters: Critical error in drawSizeMattersGraphicsForToken", error);

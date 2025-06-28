@@ -75,8 +75,12 @@ export class SizeMattersApp extends Application {
         return;
       }
       
+      console.log("Size Matters: saveSettings() called for token", this.tokenId);
+      
       // Save settings to token flags instead of global module settings
       await this.token.document.setFlag('size-matters', 'settings', foundry.utils.duplicate(this.settings));
+      
+      console.log("Size Matters: Settings saved successfully to token flags");
     } catch (error) {
       console.error("Size Matters: Error saving settings", error);
       ui.notifications?.error("Failed to save settings");
@@ -266,12 +270,17 @@ export class SizeMattersApp extends Application {
       const cell = this.grid[key];
       if (!cell || cell.isCenter) return;
       
+      console.log(`Size Matters: Toggling grid cell ${key}, current state: ${cell.selected}`);
+      
       cell.selected = !cell.selected;
       element.setAttribute("fill", cell.selected ? "#2196F3" : "#ffffff");
       element.classList.toggle('grid-selected', cell.selected);
       element.classList.toggle('grid-unselected', !cell.selected);
       
       this.settings.grid = this.grid;
+      
+      console.log(`Size Matters: Grid cell ${key} toggled to: ${cell.selected}`);
+      
       this.saveSettings();
     } catch (error) {
       console.error("Size Matters: Error toggling grid cell", error);
@@ -299,6 +308,8 @@ export class SizeMattersApp extends Application {
 
   async drawGrid(html) {
     try {
+      console.log("Size Matters: drawGrid() called");
+      
       this.updateSettingsFromForm(html);
       
       const selectedCells = Object.values(this.grid).filter(h => h.selected);
@@ -306,6 +317,8 @@ export class SizeMattersApp extends Application {
         ui.notifications?.warn("Select at least one cell!");
         return;
       }
+
+      console.log(`Size Matters: Drawing grid with ${selectedCells.length} selected cells`);
 
       // Update settings and save to token flags
       this.settings.grid = this.grid;
@@ -318,6 +331,8 @@ export class SizeMattersApp extends Application {
       this._gridGraphics = this.token.sizeMattersGrid;
       this._imageSprite = this.token.sizeMattersImage;
       this._gridTicker = this.token.sizeMattersGridTicker;
+      
+      console.log("Size Matters: drawGrid() completed successfully");
     } catch (error) {
       console.error("Size Matters: Error drawing grid", error);
       ui.notifications?.error("Failed to draw grid");

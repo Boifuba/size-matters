@@ -78,12 +78,22 @@ Hooks.on('updateToken', (tokenDocument, changes, options, userId) => {
   try {
     // Check if Size Matters settings were updated
     if (changes.flags && changes.flags['size-matters']) {
-      console.log(`Size Matters: Token ${tokenDocument.id} settings updated, redrawing graphics`);
+      console.log(`Size Matters: Token ${tokenDocument.id} settings updated by user ${userId}`);
+      console.log("Size Matters: Changes detected:", changes.flags['size-matters']);
       
       const token = canvas.tokens.get(tokenDocument.id);
       if (token && validateToken(token)) {
+        console.log(`Size Matters: Token found, current graphics state:`, {
+          hasGrid: !!token.sizeMattersGrid,
+          hasImage: !!token.sizeMattersImage,
+          hasTicker: !!token.sizeMattersGridTicker
+        });
+        
         // Redraw graphics for this token, which will be visible to all clients
+        console.log("Size Matters: Triggering graphics redraw...");
         drawSizeMattersGraphicsForToken(token);
+      } else {
+        console.warn("Size Matters: Token not found or invalid for redraw");
       }
     }
   } catch (error) {
