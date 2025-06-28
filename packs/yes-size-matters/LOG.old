@@ -1,3 +1,5 @@
-2025/06/26-05:50:39.989989 71ac99fbd640 Recovering log #62
-2025/06/26-05:50:39.991329 71ac99fbd640 Delete type=0 #62
-2025/06/26-05:50:39.991351 71ac99fbd640 Delete type=3 #60
+2025/06/28-07:04:26.332760 743a7c7bc640 Log #68: 0 ops saved to Table #69 OK
+2025/06/28-07:04:26.332842 743a7c7bc640 Archiving /home/cefassathler/.local/share/FoundryVTT/Data/modules/size-matters/packs/yes-size-matters/000068.log: OK
+2025/06/28-07:04:26.332986 743a7c7bc640 Table #15: 1 entries OK
+2025/06/28-07:04:26.333068 743a7c7bc640 Archiving /home/cefassathler/.local/share/FoundryVTT/Data/modules/size-matters/packs/yes-size-matters/MANIFEST-000066: OK
+2025/06/28-07:04:26.333632 743a7c7bc640 **** Repaired leveldb /home/cefassathler/.local/share/FoundryVTT/Data/modules/size-matters/packs/yes-size-matters; recovered 1 files; 578 bytes. Some data may have been lost. ****

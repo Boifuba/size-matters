@@ -537,6 +537,10 @@ class SizeMattersApp extends Application {
     if (currentToken && currentToken.sizeMattersImage) {
       currentToken.sizeMattersImage.visible = !currentToken.sizeMattersImage.visible;
       this.settings.imageVisible = currentToken.sizeMattersImage.visible;
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersImage) {
+      currentToken.sizeMattersImage.visible = !currentToken.sizeMattersImage.visible;
+      this.settings.imageVisible = currentToken.sizeMattersImage.visible;
       this.saveSettings();
     } else {
       ui.notifications.warn("No image has been loaded!");
@@ -544,6 +548,10 @@ class SizeMattersApp extends Application {
   }
 
   toggleGridVisibility() {
+    const currentToken = canvas.tokens.get(this.tokenId);
+    if (currentToken && currentToken.sizeMattersGrid) {
+      currentToken.sizeMattersGrid.visible = !currentToken.sizeMattersGrid.visible;
+      this.settings.gridVisible = currentToken.sizeMattersGrid.visible;
     const currentToken = canvas.tokens.get(this.tokenId);
     if (currentToken && currentToken.sizeMattersGrid) {
       currentToken.sizeMattersGrid.visible = !currentToken.sizeMattersGrid.visible;
@@ -631,6 +639,7 @@ class SizeMattersApp extends Application {
   }
 
   async close(options = {}) {
+    // Only clear references, don't remove graphics from canvas
     // Only clear references, don't remove graphics from canvas
     this.clearGraphics();
     await this.saveSettings();
