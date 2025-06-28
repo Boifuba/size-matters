@@ -1,78 +1,69 @@
 <form class="size-matters-form">
-  <!-- <div class="form-group">
-    <label>Grid:</label>
-    <span>{{gridType}} | Size: {{gridSize}}px</span>
-  </div> -->
-
-  <div class="form-group grid-svg-container">
+  <!-- Grid Selection -->
+  <div class="grid-container">
     {{{gridSVG}}}
   </div>
 
-
-  <div class="form-group">
-    <button type="button" class="file-picker-button"><i class="fas fa-folder-open"></i> Browse Image</button>
-  </div>
-
-  <div class="form-grid">
-    <div class="form-group">
-      <label for="imageScale">Image Scale:</label>
-      <input type="range" class="range-slider" id="imageScale" name="imageScale" min="0.1" max="3.0" step="0.1" value="{{imageScale}}">
-      <span class="range-value" id="sval">{{imageScale}}</span>
+  <!-- Preset Management -->
+  <div class="preset-section">
+    <div class="preset-row">
+      <input type="text" id="preset-name" placeholder="Enter preset name..." class="preset-input">
+      <button type="button" class="save-preset-button">💾</button>
     </div>
-    <div class="form-group"></div>
-  </div>
-
-  <div class="form-grid">
-    <div class="form-group">
-      <label for="imageOffsetX">Image X Position:</label>
-      <input type="range" class="range-slider" id="imageOffsetX" name="imageOffsetX" min="-200" max="200" value="{{imageOffsetX}}">
-      <span class="range-value" id="xval">{{imageOffsetX}}</span>
-    </div>
-    <div class="form-group">
-      <label for="imageOffsetY">Image Y Position:</label>
-      <input type="range" class="range-slider" id="imageOffsetY" name="imageOffsetY" min="-200" max="200" value="{{imageOffsetY}}">
-      <span class="range-value" id="yval">{{imageOffsetY}}</span>
+    <div class="preset-row">
+      <select id="preset-select" class="preset-select">
+        <option value="">Select preset...</option>
+      </select>
+      <button type="button" class="load-preset-button">📂</button>
+      <button type="button" class="delete-preset-button">🗑️</button>
     </div>
   </div>
 
-  <!-- <hr/> -->
-
-  <div class="form-grid">
-    <div class="form-group">
-      <label for="color">Outline Color:</label>
-      <input type="color" class="color-input" id="color" name="color" value="{{color}}">
+  <!-- Image Controls -->
+  <div class="section">
+    <button type="button" class="file-picker-button">📁 Browse Image</button>
+    <div class="control-row">
+      <label>Scale:</label>
+      <input type="range" class="slider" name="imageScale" min="0.1" max="3.0" step="0.1" value="{{imageScale}}">
+      <span class="value" id="sval">{{imageScale}}</span>
     </div>
-    <div class="form-group">
-      <label for="thickness">Thickness:</label>
-      <input type="range" class="range-slider" id="thickness" name="thickness" min="1" max="10" value="{{thickness}}">
-      <span class="range-value" id="tval">{{thickness}}</span>
+    <div class="control-row">
+      <label>X:</label>
+      <input type="range" class="slider" name="imageOffsetX" min="-200" max="200" value="{{imageOffsetX}}">
+      <span class="value" id="xval">{{imageOffsetX}}</span>
     </div>
-    <div class="form-group">
-      <label for="fillColor">Fill Color:</label>
-      <input type="color" class="color-input" id="fillColor" name="fillColor" value="{{fillColor}}">
-    </div>
-    <div class="form-group">
-      <label for="alpha">Alpha:</label>
-      <input type="range" class="range-slider" id="alpha" name="alpha" min="0.1" max="1" step="0.1" value="{{alpha}}">
-      <span class="range-value" id="aval">{{alpha}}</span>
-    </div>
-    <div class="form-group checkbox-group">
-      <input type="checkbox" id="enableFill" name="enableFill" {{#if enableFill}}checked{{/if}}>
-      <label for="enableFill">Enable Fill</label>
-    </div>
-    <div class="form-group checkbox-group">
-      <input type="checkbox" id="enableContour" name="enableContour" {{#if enableContour}}checked{{/if}}>
-      <label for="enableContour">Enable Outline</label>
+    <div class="control-row">
+      <label>Y:</label>
+      <input type="range" class="slider" name="imageOffsetY" min="-200" max="200" value="{{imageOffsetY}}">
+      <span class="value" id="yval">{{imageOffsetY}}</span>
     </div>
   </div>
 
-  <div class="form-actions">
-    <button type="button" class="draw-button"><i class="fas fa-paint-brush"></i> Draw</button>
-    <button type="button" class="clear-button"><i class="fas fa-eraser"></i> Clear</button>
+  <!-- Appearance Controls -->
+  <div class="section">
+    <div class="control-row">
+      <label>Outline:</label>
+      <input type="color" class="color-input" name="color" value="{{color}}">
+      <input type="range" class="slider" name="thickness" min="1" max="10" value="{{thickness}}">
+      <span class="value" id="tval">{{thickness}}</span>
+    </div>
+    <div class="control-row">
+      <label>Fill:</label>
+      <input type="color" class="color-input" name="fillColor" value="{{fillColor}}">
+      <input type="range" class="slider" name="alpha" min="0.1" max="1" step="0.1" value="{{alpha}}">
+      <span class="value" id="aval">{{alpha}}</span>
+    </div>
+    <div class="checkbox-row">
+      <label><input type="checkbox" name="enableContour" {{#if enableContour}}checked{{/if}}> Outline</label>
+      <label><input type="checkbox" name="enableFill" {{#if enableFill}}checked{{/if}}> Fill</label>
+    </div>
   </div>
 
-  <div class="form-actions visibility-controls">
-    <button type="button" class="toggle-image-button"><i class="fas fa-image"></i> Toggle Image</button>
-    <button type="button" class="toggle-grid-button"><i class="fas fa-shapes"></i> Toggle Grid</button>
+  <!-- Action Buttons -->
+  <div class="actions">
+    <button type="button" class="action-btn draw-button">🎨 Draw</button>
+    <button type="button" class="action-btn clear-button">🧹 Clear</button>
+    <button type="button" class="action-btn toggle-image-button">🖼️ Image</button>
+    <button type="button" class="action-btn toggle-grid-button">⬜ Grid</button>
   </div>
 </form>

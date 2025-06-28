@@ -1,185 +1,236 @@
 .size-matters-form {
   font-family: 'Roboto', sans-serif;
-  padding: 20px;
+  padding: 12px;
   background: linear-gradient(135deg, #f5f3e7 0%, #e8e6d3 100%);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  min-width: 550px;
+  border-radius: 6px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+  max-width: 400px;
+  font-size: 12px;
 }
 
-.form-group {
-  /* margin-bottom: 15px; */
-}
-
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  /* margin-bottom: 20px; */
-}
-
-.grid-svg-container {
-  /* text-align: center;
+/* Grid Container */
+.grid-container {
+  text-align: center;
+  margin-bottom: 10px;
   background: rgba(255,255,255,0.7);
-  border-radius: 6px;
-  border: 1px solid #d4d4aa; */
+  border-radius: 4px;
+  border: 1px solid #d4d4aa;
+  padding: 8px;
 }
 
-.grid-svg-container svg {
-  /* border: 2px solid #8b8b5a;
-  border-radius: 6px;
+.grid-container svg {
+  border: 1px solid #8b8b5a;
+  border-radius: 4px;
   background: #fafaf5;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   max-width: 100%;
-  height: auto; */
+  height: auto;
 }
 
+/* Preset Management */
+.preset-section {
+  margin-bottom: 10px;
+  padding: 8px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 4px;
+  border: 1px solid #d4d4aa;
+}
+
+.preset-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.preset-row:last-child {
+  margin-bottom: 0;
+}
+
+.preset-input, .preset-select {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #8b8b5a;
+  border-radius: 3px;
+  font-size: 11px;
+  background: white;
+}
+
+.save-preset-button, .load-preset-button, .delete-preset-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #8b8b5a;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #8b8b5a, #6b6b3a);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.save-preset-button:hover, .load-preset-button:hover, .delete-preset-button:hover {
+  background: linear-gradient(135deg, #6b6b3a, #5a5a2a);
+  transform: translateY(-1px);
+}
+
+/* Sections */
+.section {
+  margin-bottom: 10px;
+  padding: 6px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 4px;
+}
+
+/* Control Rows */
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.control-row:last-child {
+  margin-bottom: 0;
+}
+
+.control-row label {
+  min-width: 40px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b6b3a;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #8b8b5a;
+}
+
+/* Inputs */
+.color-input {
+  width: 30px;
+  height: 24px;
+  border: 1px solid #8b8b5a;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.slider {
+  flex: 1;
+  accent-color: #8b8b5a;
+  height: 18px;
+}
+
+.value {
+  min-width: 30px;
+  font-weight: bold;
+  color: #6b6b3a;
+  background: rgba(255,255,255,0.8);
+  padding: 2px 4px;
+  border-radius: 2px;
+  border: 1px solid #d4d4aa;
+  font-size: 10px;
+  text-align: center;
+}
+
+/* File Picker Button */
 .file-picker-button {
   width: 100%;
-  padding: 10px 15px;
-  border: 2px solid #8b8b5a;
-  border-radius: 4px;
+  padding: 6px 8px;
+  border: 1px solid #8b8b5a;
+  border-radius: 3px;
   background: linear-gradient(135deg, #8b8b5a, #6b6b3a);
   color: white;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 13px;
+  font-size: 11px;
+  margin-bottom: 6px;
 }
 
 .file-picker-button:hover {
   background: linear-gradient(135deg, #6b6b3a, #5a5a2a);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(139, 139, 90, 0.3);
 }
 
-.color-input {
-  width: 100%;
-  height: 35px;
-  border: 2px solid #8b8b5a;
-  border-radius: 4px;
-  cursor: pointer;
-  background: white;
+/* Action Buttons */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
-.range-slider {
-  width: 70%;
-  margin-right: 10px;
-  accent-color: #8b8b5a;
-}
-
-.range-value {
-  font-weight: bold;
-  color: #6b6b3a;
-  background: rgba(255,255,255,0.8);
-  padding: 2px 8px;
-  border-radius: 3px;
-  border: 1px solid #d4d4aa;
-  min-width: 40px;
-  display: inline-block;
-  text-align: center;
-  font-size: 12px;
-}
-
-.checkbox-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.checkbox-group input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #8b8b5a;
-}
-
-.checkbox-group label {
-  margin: 0;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-
-
-.form-actions {
-  display: flex;
-  
-  justify-content: center;
-  margin-top: 2px;
-}
-
-.form-actions button {
-  padding: 10px 20px;
+.action-btn {
+  padding: 6px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 3px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-size: 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  justify-content: center;
+  gap: 4px;
 }
 
 .draw-button {
   background: linear-gradient(135deg, #4CAF50, #45a049);
   color: white;
-  box-shadow: 0 3px 8px rgba(76, 175, 80, 0.3);
 }
 
 .draw-button:hover {
   background: linear-gradient(135deg, #45a049, #3d8b40);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
 }
 
 .clear-button {
   background: linear-gradient(135deg, #f44336, #d32f2f);
   color: white;
-  box-shadow: 0 3px 8px rgba(244, 67, 54, 0.3);
 }
 
 .clear-button:hover {
   background: linear-gradient(135deg, #d32f2f, #b71c1c);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
-}
-
-.visibility-controls {
-  /* margin-top: 15px;
-  border-top: 1px solid #d4d4aa;
-  padding-top: 15px; */
 }
 
 .toggle-image-button {
   background: linear-gradient(135deg, #FF9800, #F57C00);
   color: white;
-  box-shadow: 0 3px 8px rgba(255, 152, 0, 0.3);
 }
 
 .toggle-image-button:hover {
   background: linear-gradient(135deg, #F57C00, #E65100);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
 }
 
 .toggle-grid-button {
   background: linear-gradient(135deg, #9C27B0, #7B1FA2);
   color: white;
-  box-shadow: 0 3px 8px rgba(156, 39, 176, 0.3);
 }
 
 .toggle-grid-button:hover {
   background: linear-gradient(135deg, #7B1FA2, #4A148C);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4);
 }
 
+/* Grid Interaction */
 .grid-selectable {
   cursor: pointer;
   transition: all 0.2s ease;
