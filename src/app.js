@@ -30,7 +30,7 @@ export class SizeMattersApp extends Application {
       id: "size-matters",
       title: "Size Matters",
       template: "modules/size-matters/templates/size-matters-dialog.html",
-      width: 600,
+      width: 500,
       height: "auto",
       resizable: false,
       closeOnSubmit: false
@@ -184,19 +184,19 @@ export class SizeMattersApp extends Application {
       html.find('input[name="imageScale"]').on('input', (event) => {
         html.find('#sval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.updateImageScale();
+        this.drawGrid(html);
       });
 
       html.find('input[name="imageOffsetX"]').on('input', (event) => {
         html.find('#xval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.updateImagePosition();
+        this.drawGrid(html);
       });
 
       html.find('input[name="imageOffsetY"]').on('input', (event) => {
         html.find('#yval').text(event.target.value);
         this.updateSettingsFromForm(html);
-        this.updateImagePosition();
+        this.drawGrid(html);
       });
 
       html.find('input[name="color"]').on('change', (event) => {
@@ -225,9 +225,11 @@ export class SizeMattersApp extends Application {
       html.find('.toggle-image-button').click(() => this.toggleImageVisibility());
       html.find('.toggle-grid-button').click(() => this.toggleGridVisibility());
 
+      // CRITICAL FIX: Add drawGrid call to ensure real-time updates
       html.find('input:not(.clear-button)').on('change', () => {
         this.updateSettingsFromForm(html);
         this.saveSettings();
+        this.drawGrid(html); // This ensures immediate visual updates
       });
     } catch (error) {
       console.error("Size Matters: Error activating listeners", error);
