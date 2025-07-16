@@ -349,8 +349,6 @@ function clearTokenSizeMattersGraphics(token) {
 }
 
 function clearAllSizeMattersGraphics() {
-  console.log("Size Matters: Clearing all graphics and tickers");
-
   if (!canvas || !canvas.tokens) return;
 
   for (const token of canvas.tokens.placeables) {
@@ -1285,8 +1283,6 @@ window.openRideManager = function() {
 
 //HOOK DE INICIALIZAÇÃO: O lugar correto para registrar configurações.
 Hooks.once('init', () => {
-  console.log("Size Matters | Registrando configurações do módulo.");
-  
   game.settings.register('size-matters', 'presets', {
     name: 'Size Matters Presets',
     hint: 'Stored presets for Size Matters configurations',
@@ -1299,7 +1295,6 @@ Hooks.once('init', () => {
 
 // HOOK DE PRONTO: O lugar correto para adicionar elementos de UI como botões.
 Hooks.once('ready', () => {
-  console.log("Size Matters | Módulo pronto. Adicionando botão de controle.");
   window.sizeMattersApp = null; // Inicializa a variável global
 });
 
@@ -1337,7 +1332,6 @@ Hooks.on('chatMessage', (chatLog, message, chatData) => {
 Hooks.on('controlToken', (token, controlled) => {
   if (window.sizeMattersApp && window.sizeMattersApp.rendered) {
     if (controlled) {
-      console.log(`Size Matters: Token ${token.id} selected, updating app`);
       window.sizeMattersApp.setControlledToken(token);
     }
   }
@@ -1345,13 +1339,11 @@ Hooks.on('controlToken', (token, controlled) => {
 
 Hooks.on('releaseToken', (token, controlled) => {
   if (window.sizeMattersApp && window.sizeMattersApp.rendered && canvas.tokens.controlled.length === 0) {
-    console.log("Size Matters: No tokens selected, updating app");
     window.sizeMattersApp.setControlledToken(null);
   }
 });
 
 Hooks.on('canvasInit', () => {
-  console.log("Size Matters: Canvas initializing, clearing all graphics");
   clearAllSizeMattersGraphics();
   
   // Clear texture cache when canvas changes
@@ -1363,15 +1355,12 @@ Hooks.on('canvasInit', () => {
 
 Hooks.on('canvasReady', async () => {
   setTimeout(async () => {
-    console.log("Size Matters: Canvas ready, checking for tokens with saved graphics...");
-    
     // Restore rides from flags first
     await restoreRidesFromFlags();
     
     for (const token of canvas.tokens.placeables) {
       const settings = token.document.getFlag('size-matters', 'settings');
       if (settings && settings.grid) {
-        console.log(`Size Matters: Restoring graphics for token ${token.id}`);
         await drawSizeMattersGraphicsForToken(token);
       }
     }
@@ -1382,7 +1371,6 @@ Hooks.on('renderToken', async (token) => {
   setTimeout(async () => {
     const settings = token.document.getFlag('size-matters', 'settings');
     if (settings && settings.grid && !token.sizeMattersGrid) {
-      console.log(`Size Matters: Restoring graphics for rendered token ${token.id}`);
       await drawSizeMattersGraphicsForToken(token);
     }
   }, 100);
@@ -1400,35 +1388,24 @@ Hooks.on('deleteToken', (token) => {
 
 Hooks.on('updateScene', (scene, changes) => {
   if (changes.active === true) {
-    console.log("Size Matters: Scene changing, clearing all graphics from previous scene");
     clearAllSizeMattersGraphics();
   }
 });
 
 Hooks.on('updateToken', async (tokenDocument, changes, options, userId) => {
-  console.log("Size Matters DEBUG: ===== FOUNDRY updateToken HOOK FIRED =====", {
-    tokenId: tokenDocument.id,
-    tokenName: tokenDocument.name,
-    changes: changes,
-    userId: userId
-  });
-  
   try {
     if (changes.flags && changes.flags['size-matters']) {
-      console.log(`Size Matters: Token ${tokenDocument.id} settings updated, redrawing graphics for all users`);
       const token = canvas.tokens.get(tokenDocument.id);
       if (!token) {
-        console.warn(`Size Matters: Could not find token ${tokenDocument.id} on canvas`);
         return;
       }
       setTimeout(async () => {
         clearTokenSizeMattersGraphics(token);
         await drawSizeMattersGraphicsForToken(token);
-        console.log(`Size Matters: Graphics redrawn for token ${tokenDocument.id}`);
       }, 50);
     }
   } catch (error) {
-    console.error("Size Matters: Error in updateToken hook", error);
+    // Silent error handling
   }
 });
 
