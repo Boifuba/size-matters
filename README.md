@@ -1,288 +1,477 @@
-# Size Matters
+# Size Matters - Foundry VTT Module
 
-A comprehensive FoundryVTT module that allows you to create customizable highlights around tokens on both **hexagonal and square grids**, with optional image overlays, rotation controls, and preset management system.
-
-## Features
-
-### Core Functionality
-- **Universal Grid Support**: Works seamlessly with both **hexagonal grids** (Hex Odd-R, Hex Even-R, Hex Odd-Q, Hex Even-Q) and **square grids**
-- **Interactive Grid Selection**: Visual grid selector to choose which cells to highlight around your token
-- **Real-time Updates**: All changes are applied immediately to the canvas with live preview
-- **Token Synchronization**: Highlights automatically follow token movement and rotation
-- **Multi-user Synchronization**: Changes are instantly visible to all connected users
-
-### Advanced Image Controls
-- **Image Overlay System**: Add custom images that follow and rotate with tokens
-- **Scale Control**: Real-time scale adjustment (0.1x to 3.0x)
-- **Position Control**: Precise X/Y positioning with sliders (-200 to +200 pixels)
-- **Rotation Control**: Independent image rotation (-180° to +180°) that combines with token rotation
-- **Visibility Toggle**: Show/hide images without losing settings
-
-### Customization Options
-- **Appearance Controls**: 
-  - Outline and fill colors with color picker
-  - Adjustable thickness (1-10) and opacity (0.1-1.0)
-  - Enable/disable fill and outline independently
-- **Grid Visibility**: Toggle grid highlights independently from images
-
-### Preset Management System
-- **Save Configurations**: Save your current settings (including grid selection) as named presets
-- **Quick Loading**: Instantly apply saved presets to any token
-- **Preset Library**: Manage multiple presets for different scenarios
-- **Easy Deletion**: Remove unwanted presets with confirmation dialog
-- **Complete Settings**: Presets save ALL settings including grid selection, colors, image settings, and rotation
-
-### Accessibility Features
-- **Chat Command**: Use `/size-matters` in chat to open the module
-- **Macro Support**: Create macro buttons for quick access
-- **Persistent Settings**: Your configuration is saved per token and restored between sessions
-- **Compact Interface**: Streamlined UI with efficient space usage
-
-## Installation
-
-### Automatic Installation (Recommended)
-1. In Foundry VTT, go to the **Add-on Modules** tab
-2. Click **Install Module**
-3. Paste this manifest URL:
-   ```
-   https://github.com/Boifuba/size-matters/releases/download/0.0.6/module.json
-   ```
-4. Click **Install**
-5. Enable the module in your world's module settings
-
-### Manual Installation
-1. Download the module files from the [releases page](https://github.com/Boifuba/size-matters/releases)
-2. Extract to your FoundryVTT `Data/modules/size-matters/` directory
-3. Enable the module in your world's module settings
-
-## Usage
-
-### Quick Start
-1. **Select a Token**: Click on any token in your scene (works with hex or square grids)
-2. **Open the Module**: 
-   - Type `/size-matters` in chat, OR
-   - Run the macro `openSizeMatters()`, OR
-   - Create a macro button (see [Macro Setup](#macro-setup))
-3. **Select Grid Cells**: Click on the cells in the visual grid to select/deselect them
-4. **Customize**: Adjust colors, thickness, opacity, and add images as desired
-5. **Auto-Draw**: Changes are applied immediately and visible to all users
-
-### Chat Command
-Simply type `/size-matters` in the chat to open the Size Matters dialog. This command:
-- Works from any chat message
-- Doesn't appear in the chat log
-- Requires a token to be selected first
-
-### Grid Selection
-- **Interactive Grid**: Click cells to select/deselect them (works for both hex and square grids)
-- **Center Cell**: The green center cell represents the token's position (cannot be deselected)
-- **Real-time Preview**: Changes are applied immediately when you select cells
-- **Visual Feedback**: Selected cells appear in blue, unselected in white
-
-### Preset Management
-
-#### Saving Presets
-1. Configure your desired settings (grid selection, colors, thickness, opacity, image, rotation, etc.)
-2. Enter a name in the "Enter preset name..." field
-3. Click the **Save** button (💾 icon) to save the current configuration
-4. The preset will be available in the dropdown for future use
-
-#### Loading Presets
-1. Select a preset from the dropdown menu
-2. Click the **Load** button (📁 icon) to apply the preset settings
-3. **All settings are restored**: grid selection, colors, image settings, rotation, etc.
-4. Changes are applied immediately with visual feedback
-
-#### Deleting Presets
-1. Select the preset you want to delete from the dropdown
-2. Click the **Delete** button (🗑️ icon)
-3. Confirm the deletion in the dialog that appears
-4. The preset will be permanently removed
-
-### Image Controls
-
-#### Basic Image Setup
-- **Browse Image**: Click "Browse Image" to select an image file to overlay
-- **Supported Formats**: PNG, JPG, WEBP, SVG
-- **Auto-visibility**: Images are automatically shown when loaded
-
-#### Advanced Image Controls
-- **Scale**: Adjust image size from 0.1x to 3.0x with real-time preview
-- **X Position**: Fine-tune horizontal positioning (-200 to +200 pixels)
-- **Y Position**: Fine-tune vertical positioning (-200 to +200 pixels)
-- **Rotation**: Independent image rotation (-180° to +180°)
-- **Combined Rotation**: Image rotation combines with token rotation for realistic movement
-
-#### Image Visibility
-- **Toggle Image**: Use the "Image" button to show/hide the image overlay
-- **Persistent Settings**: Visibility state is saved and restored
-- **Non-destructive**: Hiding an image doesn't remove it, just toggles visibility
-
-### Appearance Controls
-- **Outline Color**: Color of the cell borders with color picker
-- **Fill Color**: Color of the cell interiors with color picker
-- **Thickness**: Border line thickness (1-10 pixels) with real-time preview
-- **Opacity**: Transparency level (0.1-1.0) with real-time preview
-- **Enable Outline**: Toggle outline visibility independently
-- **Enable Fill**: Toggle fill visibility independently
-
-### Action Buttons
-- **Draw**: Manually redraw the highlight (usually not needed due to auto-draw)
-- **Clear**: Remove all highlights and reset all settings to default
-- **Image**: Toggle image overlay visibility
-- **Grid**: Toggle grid highlight visibility
-
-## Grid Support
-
-### Supported Grid Types
-- **Hexagonal Grids**: 
-  - Hex Odd-R (Pointy-Top)
-  - Hex Even-R (Pointy-Top)
-  - Hex Odd-Q (Flat-Top)
-  - Hex Even-Q (Flat-Top)
-- **Square Grids**: Standard square grid layout
-
-### Automatic Detection
-The module automatically detects your scene's grid type and adjusts the highlight system accordingly. No manual configuration needed!
-
-## Macro Setup
-
-Create a macro with this code to easily access the module:
-
-```javascript
-openSizeMatters();
-```
-
-**Setup Instructions:**
-1. Create a new macro in Foundry VTT
-2. Set the macro type to **"Script"**
-3. Paste the code above
-4. Give it a name like "Size Matters"
-5. Optionally add it to your hotbar for quick access
-
-## Requirements
-
-- **FoundryVTT**: Version 11 or higher (verified up to v13)
-- **Grid Type**: Works with hexagonal grids and square grids
-- **Scene Setup**: Your scene must have a grid configured
-- **Permissions**: Players need token control permissions to use the module
-
-## Technical Details
-
-### Performance Optimizations
-- Uses PIXI.Graphics for efficient rendering
-- Optimized position tracking with change detection
-- Automatic cleanup when dialogs are closed
-- Efficient ticker management to prevent memory leaks
-- Real-time updates without performance impact
-
-### Data Storage
-- **Token Settings**: Stored as flags on individual tokens
-- **Presets**: Stored as world-level game settings (GM only)
-- **Synchronization**: Automatic updates across all connected users
-- **Persistence**: Settings survive page reloads and scene changes
-
-### Advanced Features
-- **Multi-user Support**: Changes are synchronized across all connected users
-- **Token Following**: Graphics automatically follow token movement and rotation
-- **Image Rotation**: Independent image rotation that combines with token rotation
-- **Preset System**: Complete configuration management with save/load/delete
-- **Error Handling**: Robust error handling and validation throughout
-
-## Troubleshooting
-
-### Common Issues
-
-**"Select a token first"**
-- Make sure you have a token selected before running the macro or chat command
-- Ensure you have permission to control the selected token
-
-**"This module works with hexagonal and square grids only!"**
-- Your scene must use a supported grid type
-- Check your scene configuration under Grid settings
-- Supported: Hex grids (all variants) and Square grids
-
-**Image not loading**
-- Verify the image path is correct and accessible to FoundryVTT
-- Ensure the image file exists and hasn't been moved
-- Supported formats: PNG, JPG, WEBP, SVG
-- Check browser console for specific error messages
-
-**Highlights not following token**
-- Try clearing and redrawing the highlight
-- Make sure the token hasn't been deleted or replaced
-- Check that the scene grid is properly configured
-
-**Chat command not working**
-- Ensure the module is enabled and loaded
-- Try refreshing the page if the module was recently enabled
-- Check browser console for error messages
-
-**Presets not saving**
-- Ensure you have GM permissions (presets are world-level settings)
-- Check that the preset name doesn't contain special characters
-- Try refreshing and attempting again
-
-**Image rotation not working**
-- Ensure the image is properly loaded first
-- Check that the rotation slider is being moved
-- Image rotation combines with token rotation
-
-### Performance Tips
-- Use appropriately sized images for better performance
-- Clear highlights when not needed to free up resources
-- The module automatically optimizes rendering for your grid type
-- Limit the number of tokens with active highlights in complex scenes
-
-### Debug Information
-If you encounter issues:
-1. Open browser console (F12)
-2. Look for "Size Matters:" prefixed messages
-3. Include relevant console output when reporting issues
-
-## Contributing
-
-We welcome contributions! Please feel free to:
-- Submit bug reports on the [GitHub issues page](https://github.com/Boifuba/size-matters/issues)
-- Suggest new features or improvements
-- Submit pull requests with fixes or enhancements
-- Help improve documentation
-
-### Development Setup
-1. Clone the repository
-2. The module uses a single-file architecture for simplicity
-3. Test changes in a development Foundry instance
-4. Follow the existing code style and patterns
-
-## Changelog
-
-### Version 0.0.6
-- **NEW**: Complete preset management system (save/load/delete configurations)
-- **NEW**: Image rotation control (-180° to +180°) with token rotation combination
-- **NEW**: `/size-matters` chat command for easy access
-- **NEW**: Enhanced multi-user synchronization
-- **IMPROVED**: Streamlined UI with compact design and neutral button styling
-- **IMPROVED**: Better error handling and validation throughout
-- **IMPROVED**: Performance optimizations and memory management
-- **IMPROVED**: Image visibility toggle now preserves image without removal
-- **FIXED**: Grid selection now properly saved and restored in presets
-- **FIXED**: Image settings properly synchronized across all users
-
-### Previous Versions
-- See [releases page](https://github.com/Boifuba/size-matters/releases) for full changelog
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **GitHub Issues**: [Report bugs or request features](https://github.com/Boifuba/size-matters/issues)
-- **Discord**: Contact Boifubá for direct support
-- **Documentation**: This README contains comprehensive usage instructions
+[English](#english) | [Português](#português)
 
 ---
 
-**Size Matters** - Because sometimes, size really does matter! 🎯
+## English
 
-*A powerful, feature-rich grid highlighting tool for FoundryVTT with advanced image controls and preset management.*
+A Foundry VTT module that allows you to create custom shapes and visual effects on tokens, plus "ride" functionality where tokens can automatically follow other tokens with proper rotation and relative positioning.
+
+### Table of Contents
+
+- [Installation](#installation)
+- [How to Open the Module](#how-to-open-the-module)
+- [Features](#features)
+- [Usage Guide](#usage-guide)
+- [Chat Commands](#chat-commands)
+- [Grid Support](#grid-support)
+- [Troubleshooting](#troubleshooting)
+
+### Installation
+
+1. In Foundry VTT, go to **Add-on Modules**
+2. Click **Install Module**
+3. Paste the manifest URL or search for "Size Matters"
+4. Click **Install**
+5. Enable the module in your desired world
+
+### How to Open the Module
+
+#### Method 1: Toolbar Button (Recommended)
+
+1. **Select a token** on the canvas
+2. In the left toolbar, look for the **hexagon icon**
+3. Click the **"Size Matters Config"** button
+4. The configuration dialog will open
+
+#### Method 2: Chat Commands
+
+Type one of these commands in the chat:
+
+```
+/size
+```
+
+This will open the Size Matters configuration dialog.
+
+For the Ride Manager:
+```
+/ride
+```
+
+This will open the Ride Manager dialog.
+
+#### Method 3: JavaScript Console (Advanced Users)
+
+Open the browser console (F12) and type:
+
+```javascript
+// Open Size Matters config
+openSizeMatters();
+
+// Open Ride Manager
+openRideManager();
+```
+
+### Features
+
+#### Visual Customization
+- **Grid Selection**: Click and drag to select grid cells around your token
+- **Custom Shapes**: Works with both hexagonal and square grids
+- **Color Customization**: Choose outline and fill colors
+- **Transparency Control**: Adjust alpha values for fills
+- **Image Overlay**: Add custom images with scaling, positioning, and rotation
+- **Preset System**: Save and load your favorite configurations
+
+#### Ride System
+- **Token Following**: Make tokens follow a leader with relative positioning
+- **Rotation Support**: Followers maintain relative rotation to the leader
+- **Multi-Follower**: One leader can have multiple followers
+- **Persistent**: Rides are saved and restored when the scene reloads
+
+### Usage Guide
+
+#### Basic Shape Creation
+
+1. **Open the module** using any method above
+2. **Select grid cells** by clicking and dragging on the grid preview
+3. **Customize appearance**:
+   - Choose outline color and thickness
+   - Set fill color and transparency
+   - Toggle outline/fill on/off
+4. **Apply changes** - shapes appear automatically as you configure
+
+#### Adding Images
+
+1. Click **"Browse Image"** button
+2. Select an image file from your Foundry files
+3. Adjust image properties:
+   - **Scale**: Resize the image (0.1x to 3.0x)
+   - **X/Y Offset**: Position the image relative to token center
+   - **Rotation**: Rotate the image (-180° to 180°)
+4. Use **"Image"** button to toggle visibility
+
+#### Using Presets
+
+1. **Save a Preset**:
+   - Configure your desired settings
+   - Enter a name in the preset field
+   - Click the **save icon**
+
+2. **Load a Preset**:
+   - Select a preset from the dropdown
+   - Click the **play icon**
+
+3. **Delete a Preset**:
+   - Select a preset from the dropdown
+   - Click the **trash icon**
+
+#### Ride System
+
+1. **Open Ride Manager** with `/ride` command or `openRideManager()`
+2. **Select Leader**: Choose which token will be the leader
+3. **Select Followers**: Check the tokens that should follow
+4. **Start Ride**: Click "Start Ride" button
+5. **Manage Active Rides**: View and stop active rides in the manager
+
+### Chat Commands
+
+| Command | Description |
+|---------|-------------|
+| `/size` | Opens the Size Matters configuration dialog |
+| `/ride` | Opens the Ride Manager dialog |
+
+### Grid Support
+
+#### Supported Grid Types
+- **Square Grids**: Full support
+- **Hexagonal Grids**: All variants supported
+  - Odd-R (Pointy-top, odd rows offset)
+  - Even-R (Pointy-top, even rows offset)  
+  - Odd-Q (Flat-top, odd columns offset)
+  - Even-Q (Flat-top, even columns offset)
+- **Gridless**: Not supported
+
+#### Grid Interaction
+- **Click**: Select/deselect individual cells
+- **Click + Drag**: Select multiple cells at once
+- **Green Cell**: Token center (cannot be deselected)
+- **Blue Cells**: Selected cells
+- **White Cells**: Available cells
+
+### Controls Reference
+
+#### Main Dialog Controls
+- **Grid Preview**: Interactive grid for cell selection
+- **Color Pickers**: Set outline and fill colors
+- **Sliders**: Adjust thickness, transparency, image properties
+- **Checkboxes**: Toggle outline/fill visibility
+- **Buttons**:
+  - **Ride**: Open Ride Manager
+  - **Clear**: Reset all settings
+  - **Image**: Toggle image visibility
+  - **Grid**: Toggle grid visibility
+
+#### Ride Manager Controls
+- **Leader Dropdown**: Select the leading token
+- **Follower Checkboxes**: Choose following tokens
+- **Active Groups**: View and manage current rides
+- **Buttons**:
+  - **Start Ride**: Begin following
+  - **Stop All**: End all rides
+  - **Remove**: Remove specific followers or groups
+
+### Advanced Features
+
+#### Token Selection Integration
+- Automatically updates when you select different tokens
+- Controlled tokens are highlighted in the Ride Manager
+- Settings are saved per-token
+
+#### Performance Optimizations
+- Efficient PIXI graphics rendering
+- Texture caching for images
+- Safe memory cleanup
+- Optimized ticker functions
+
+### Troubleshooting
+
+#### Common Issues
+
+**"This module works with hexagonal and square grids only!"**
+- Solution: Change your scene's grid type to square or hexagonal
+
+**Graphics not appearing**
+- Ensure you have selected grid cells
+- Check that outline or fill is enabled
+- Try clearing and reconfiguring
+
+**Ride not working**
+- Make sure both leader and followers are selected
+- Verify tokens exist on the current scene
+- Check console for error messages
+
+**Performance issues**
+- Reduce number of active graphics
+- Clear unused presets
+- Restart Foundry if memory usage is high
+
+#### Debug Commands
+
+Open browser console (F12) and use:
+
+```javascript
+// Check active rides
+console.log(window.sizeMattersActiveRides);
+
+// Clear all graphics
+clearAllSizeMattersGraphics();
+
+// Check texture cache
+console.log(textureCache);
+```
+
+#### Getting Help
+
+1. Check the browser console (F12) for error messages
+2. Disable other modules to test for conflicts
+3. Report issues with:
+   - Foundry VTT version
+   - Module version
+   - Browser type
+   - Error messages from console
+
+---
+
+## Português
+
+Um módulo para Foundry VTT que permite criar formas personalizadas e efeitos visuais em tokens, além de funcionalidade de "cavalgar" onde tokens podem seguir outros tokens automaticamente com rotação e posicionamento relativo adequados.
+
+### Índice
+
+- [Instalação](#instalação-1)
+- [Como Abrir o Módulo](#como-abrir-o-módulo-1)
+- [Funcionalidades](#funcionalidades-1)
+- [Guia de Uso](#guia-de-uso-1)
+- [Comandos de Chat](#comandos-de-chat-1)
+- [Suporte a Grades](#suporte-a-grades)
+- [Solução de Problemas](#solução-de-problemas-1)
+
+### Instalação
+
+1. No Foundry VTT, vá para **Add-on Modules**
+2. Clique em **Install Module**
+3. Cole a URL do manifesto ou procure por "Size Matters"
+4. Clique em **Install**
+5. Ative o módulo no mundo desejado
+
+### Como Abrir o Módulo
+
+#### Método 1: Botão na Barra de Ferramentas (Recomendado)
+
+1. **Selecione um token** no canvas
+2. Na barra de ferramentas à esquerda, procure pelo **ícone de hexágono**
+3. Clique no botão **"Size Matters Config"**
+4. O diálogo de configuração será aberto
+
+#### Método 2: Comandos de Chat
+
+Digite um destes comandos no chat:
+
+```
+/size
+```
+
+Isso abrirá o diálogo de configuração do Size Matters.
+
+Para o Gerenciador de Cavalgar:
+```
+/ride
+```
+
+Isso abrirá o diálogo do Gerenciador de Cavalgar.
+
+#### Método 3: Console JavaScript (Usuários Avançados)
+
+Abra o console do navegador (F12) e digite:
+
+```javascript
+// Abrir configuração do Size Matters
+openSizeMatters();
+
+// Abrir Gerenciador de Cavalgar
+openRideManager();
+```
+
+### Funcionalidades
+
+#### Personalização Visual
+- **Seleção de Grade**: Clique e arraste para selecionar células da grade ao redor do token
+- **Formas Personalizadas**: Funciona com grades hexagonais e quadradas
+- **Personalização de Cores**: Escolha cores de contorno e preenchimento
+- **Controle de Transparência**: Ajuste valores alfa para preenchimentos
+- **Sobreposição de Imagem**: Adicione imagens personalizadas com escala, posicionamento e rotação
+- **Sistema de Presets**: Salve e carregue suas configurações favoritas
+
+#### Sistema de Cavalgar
+- **Seguir Tokens**: Faça tokens seguirem um líder com posicionamento relativo
+- **Suporte a Rotação**: Seguidores mantêm rotação relativa ao líder
+- **Múltiplos Seguidores**: Um líder pode ter vários seguidores
+- **Persistente**: Cavalgadas são salvas e restauradas quando a cena recarrega
+
+### Guia de Uso
+
+#### Criação Básica de Formas
+
+1. **Abra o módulo** usando qualquer método acima
+2. **Selecione células da grade** clicando e arrastando na prévia da grade
+3. **Personalize a aparência**:
+   - Escolha cor e espessura do contorno
+   - Defina cor e transparência do preenchimento
+   - Ative/desative contorno/preenchimento
+4. **Aplique mudanças** - formas aparecem automaticamente conforme você configura
+
+#### Adicionando Imagens
+
+1. Clique no botão **"Browse Image"**
+2. Selecione um arquivo de imagem dos seus arquivos do Foundry
+3. Ajuste propriedades da imagem:
+   - **Scale**: Redimensione a imagem (0.1x a 3.0x)
+   - **X/Y Offset**: Posicione a imagem relativa ao centro do token
+   - **Rotation**: Gire a imagem (-180° a 180°)
+4. Use o botão **"Image"** para alternar visibilidade
+
+#### Usando Presets
+
+1. **Salvar um Preset**:
+   - Configure suas configurações desejadas
+   - Digite um nome no campo de preset
+   - Clique no **ícone salvar**
+
+2. **Carregar um Preset**:
+   - Selecione um preset do dropdown
+   - Clique no **ícone play**
+
+3. **Deletar um Preset**:
+   - Selecione um preset do dropdown
+   - Clique no **ícone lixeira**
+
+#### Sistema de Cavalgar
+
+1. **Abra o Gerenciador de Cavalgar** com comando `/ride` ou `openRideManager()`
+2. **Selecione Líder**: Escolha qual token será o líder
+3. **Selecione Seguidores**: Marque os tokens que devem seguir
+4. **Iniciar Cavalgada**: Clique no botão "Start Ride"
+5. **Gerenciar Cavalgadas Ativas**: Visualize e pare cavalgadas ativas no gerenciador
+
+### Comandos de Chat
+
+| Comando | Descrição |
+|---------|-----------|
+| `/size` | Abre o diálogo de configuração do Size Matters |
+| `/ride` | Abre o diálogo do Gerenciador de Cavalgar |
+
+### Suporte a Grades
+
+#### Tipos de Grade Suportados
+- **Grades Quadradas**: Suporte completo
+- **Grades Hexagonais**: Todas as variantes suportadas
+  - Odd-R (Ponta para cima, linhas ímpares deslocadas)
+  - Even-R (Ponta para cima, linhas pares deslocadas)
+  - Odd-Q (Lado plano para cima, colunas ímpares deslocadas)
+  - Even-Q (Lado plano para cima, colunas pares deslocadas)
+- **Sem Grade**: Não suportado
+
+#### Interação com Grade
+- **Clique**: Selecionar/desselecionar células individuais
+- **Clique + Arrastar**: Selecionar múltiplas células de uma vez
+- **Célula Verde**: Centro do token (não pode ser desmarcada)
+- **Células Azuis**: Células selecionadas
+- **Células Brancas**: Células disponíveis
+
+### Referência de Controles
+
+#### Controles do Diálogo Principal
+- **Prévia da Grade**: Grade interativa para seleção de células
+- **Seletores de Cor**: Definir cores de contorno e preenchimento
+- **Sliders**: Ajustar espessura, transparência, propriedades da imagem
+- **Checkboxes**: Alternar visibilidade de contorno/preenchimento
+- **Botões**:
+  - **Ride**: Abrir Gerenciador de Cavalgar
+  - **Clear**: Resetar todas as configurações
+  - **Image**: Alternar visibilidade da imagem
+  - **Grid**: Alternar visibilidade da grade
+
+#### Controles do Gerenciador de Cavalgar
+- **Dropdown de Líder**: Selecionar o token líder
+- **Checkboxes de Seguidores**: Escolher tokens seguidores
+- **Grupos Ativos**: Visualizar e gerenciar cavalgadas atuais
+- **Botões**:
+  - **Start Ride**: Começar a seguir
+  - **Stop All**: Terminar todas as cavalgadas
+  - **Remove**: Remover seguidores ou grupos específicos
+
+### Recursos Avançados
+
+#### Integração com Seleção de Tokens
+- Atualiza automaticamente quando você seleciona tokens diferentes
+- Tokens controlados são destacados no Gerenciador de Cavalgar
+- Configurações são salvas por token
+
+#### Otimizações de Performance
+- Renderização eficiente de gráficos PIXI
+- Cache de texturas para imagens
+- Limpeza segura de memória
+- Funções ticker otimizadas
+
+### Solução de Problemas
+
+#### Problemas Comuns
+
+**"This module works with hexagonal and square grids only!"**
+- Solução: Mude o tipo de grade da sua cena para quadrada ou hexagonal
+
+**Gráficos não aparecem**
+- Certifique-se de ter selecionado células da grade
+- Verifique se contorno ou preenchimento está habilitado
+- Tente limpar e reconfigurar
+
+**Cavalgada não funciona**
+- Certifique-se de que líder e seguidores estão selecionados
+- Verifique se os tokens existem na cena atual
+- Verifique o console para mensagens de erro
+
+**Problemas de performance**
+- Reduza o número de gráficos ativos
+- Limpe presets não utilizados
+- Reinicie o Foundry se o uso de memória estiver alto
+
+#### Comandos de Debug
+
+Abra o console do navegador (F12) e use:
+
+```javascript
+// Verificar cavalgadas ativas
+console.log(window.sizeMattersActiveRides);
+
+// Limpar todos os gráficos
+clearAllSizeMattersGraphics();
+
+// Verificar cache de texturas
+console.log(textureCache);
+```
+
+#### Obtendo Ajuda
+
+1. Verifique o console do navegador (F12) para mensagens de erro
+2. Desabilite outros módulos para testar conflitos
+3. Reporte problemas com:
+   - Versão do Foundry VTT
+   - Versão do módulo
+   - Tipo de navegador
+   - Mensagens de erro do console
+
+---
+
+## License
+
+This module is licensed under the MIT License.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
+
+---
+
+**Size Matters** - Making tokens matter, one shape at a time!

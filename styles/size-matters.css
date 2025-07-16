@@ -220,10 +220,6 @@
   filter: brightness(1.1);
 }
 
-.grid-center {
-  cursor: default !important;
-}
-
 .grid-selected {
   fill: #2196F3 !important;
 }
@@ -342,6 +338,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
+  min-height: 24px;
 }
 
 .group-header strong {
@@ -352,20 +349,22 @@
 .remove-group-btn {
   width: 20px;
   height: 20px;
-  border: none;
-  color: white;
-  border-radius: 50%;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #dc3545;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
+  padding: 0 !important;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease;
 }
 
 .remove-group-btn:hover {
-  background-color: #444;
-  
+  color: #c82333;
+  box-shadow: none !important;
 }
 
 .followers-info {
@@ -386,22 +385,24 @@
 }
 
 .remove-follower-btn {
-  width: 14px;
-  height: 14px;
-  border: none;
-  background: #ffffff;
-  color: rgb(2, 2, 2);
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #dc3545;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
+  padding: 0 !important;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s ease;
 }
 
 .remove-follower-btn:hover {
-  background-color: #444;
+  color: #c82333;
+  box-shadow: none !important;
 }
 
 .no-groups {
@@ -438,38 +439,4 @@
 .start-ride-btn:hover, .stop-all-btn:hover {
   background: #555;
   transform: translateY(-1px);
-}
-
-.remove-group-btn {
-  border: none;
-  background: none;
-  color: #666;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.remove-group-btn:hover {
-  color: #ffffff;
-}
-
-.remove-follower-btn {
-  border: none;
-  background: none;
-  color: #666;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 1px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.remove-follower-btn:hover {
-  color: #ffffff;
 }

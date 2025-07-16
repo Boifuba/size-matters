@@ -1,0 +1,10 @@
+{
+  "size-matters": {
+    "settings": {
+      "debugMode": {
+        "name": "Debug Mode",
+        "hint": "Enable debug logging for Size Matters module"
+      }
+    }
+  }
+}
