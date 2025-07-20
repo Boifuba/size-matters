@@ -38,58 +38,62 @@ function drawSquare(g, x, y, size) {
 }
 
 // Global function to draw Size Matters graphics for a token
+
 async function drawSizeMattersGraphicsForToken(token) {
   if (!token || !token.document) return;
 
   const settings = token.document.getFlag('size-matters', 'settings');
   if (!settings) return;
 
-  // Clear existing graphics for this token
   clearTokenSizeMattersGraphics(token);
 
-  // Handle image sprite FIRST - independent of grid
+  // 1. CRIA UM CONTÊINER PARA TODOS OS GRÁFICOS
+  // Este contêiner será movido pelo ticker.
+  token.sizeMattersContainer = new PIXI.Container();
+
+  // 2. ADICIONA O CONTÊINER À CAMADA CORRETA
+  // A camada 'primary' fica abaixo da visão ('effects').
+  canvas.primary.addChild(token.sizeMattersContainer);
+
+  // Handle image sprite
   if (settings.imageUrl && settings.imageUrl.trim()) {
     try {
       const texture = await getTexture(settings.imageUrl);
-      if (!texture) return;
-      
-      token.sizeMattersImage = new PIXI.Sprite(texture);
-      token.sizeMattersImage.anchor.set(0.5, 0.5);
-      token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
-      token.sizeMattersImage.visible = settings.imageVisible !== false;
-      canvas.tokens.addChildAt(token.sizeMattersImage, 1);
+      if (texture) {
+        token.sizeMattersImage = new PIXI.Sprite(texture);
+        token.sizeMattersImage.anchor.set(0.5, 0.5);
+        
+        // 3. Adiciona a imagem DENTRO do nosso contêiner
+        token.sizeMattersContainer.addChild(token.sizeMattersImage);
+      }
     } catch (error) {
       console.warn("Size Matters: Failed to load image for token", token.id, error);
     }
   }
 
-  // Handle grid graphics - only if grid exists and has selected cells
-  if (!settings.grid) {
-    if (settings.imageUrl && settings.imageUrl.trim() && token.sizeMattersImage) {
-      setupImageTicker(token, settings);
-    }
-    return;
+  // Handle grid graphics
+  const selectedCells = Object.values(settings.grid || {}).filter(h => h.selected);
+  if (selectedCells.length > 0) {
+    token.sizeMattersGrid = createGridGraphics(settings, settings.grid);
+    
+    // 4. Adiciona o grid DENTRO do nosso contêiner
+    token.sizeMattersContainer.addChild(token.sizeMattersGrid);
   }
 
-  const selectedCells = Object.values(settings.grid).filter(h => h.selected);
-  if (!selectedCells.length) {
-    if (settings.imageUrl && settings.imageUrl.trim() && token.sizeMattersImage) {
-      setupImageTicker(token, settings);
-    }
-    return;
+  // Se o contêiner tem algo dentro, ativa o ticker para posicioná-lo.
+  if (token.sizeMattersContainer.children.length > 0) {
+    setupTicker(token, settings);
+  } else {
+    // Se não há nada para desenhar, limpa o contêiner vazio.
+    clearTokenSizeMattersGraphics(token);
   }
-
-  // Create grid graphics
-  token.sizeMattersGrid = createGridGraphics(settings, settings.grid);
-  token.sizeMattersGrid.interactive = false;
-  token.sizeMattersGrid.interactiveChildren = false;
-
-  token.sizeMattersGrid.visible = settings.gridVisible !== false;
-  canvas.tokens.addChildAt(token.sizeMattersGrid, 0);
-
-  setupTicker(token, settings);
 }
 
+
+
+
+
+// Simple texture cache function
 // Simple texture cache function
 async function getTexture(url) {
   if (textureCache.has(url)) {
@@ -97,9 +101,22 @@ async function getTexture(url) {
   }
 
   try {
+    // Carrega a textura da URL
     const texture = await PIXI.Texture.fromURL(url);
     
-    // Manage cache size
+    // NOVO: Verifica se a textura tem um recurso de vídeo (como .webm)
+    if (texture.baseTexture.resource && texture.baseTexture.resource.source) {
+      const videoSource = texture.baseTexture.resource.source;
+      
+      // Verifica se é um elemento de vídeo HTML
+      if (videoSource instanceof HTMLVideoElement) {
+        videoSource.loop = true; // <<< AQUI ESTÁ A MÁGICA!
+        videoSource.muted = true; // Necessário para autoplay na maioria dos navegadores
+        await videoSource.play();      // Inicia a reprodução da animação
+      }
+    }
+    
+    // Gerencia o tamanho do cache
     if (textureCache.size >= MAX_CACHE_SIZE) {
       const firstKey = textureCache.keys().next().value;
       const oldTexture = textureCache.get(firstKey);
@@ -114,6 +131,7 @@ async function getTexture(url) {
     return null;
   }
 }
+
 
 // Create grid graphics
 function createGridGraphics(settings, gridData) {
@@ -176,81 +194,77 @@ function drawHexOptimized(graphics, cx, cy, r, pointy) {
   graphics.drawPolygon(points);
 }
 
-function setupImageTicker(token, settings) {
-  if (token.sizeMattersGridTicker) {
-    try {
-      canvas.app.ticker.remove(token.sizeMattersGridTicker);
-    } catch (error) {
-      console.warn("Size Matters: Error removing ticker", error);
-    }
-  }
+// function setupImageTicker(token, settings) {
+//   if (token.sizeMattersGridTicker) {
+//     try {
+//       canvas.app.ticker.remove(token.sizeMattersGridTicker);
+//     } catch (error) {
+//       console.warn("Size Matters: Error removing ticker", error);
+//     }
+//   }
 
-  token.sizeMattersGridTicker = () => {
-    if (!token || !token.document || !token.center || !canvas || !canvas.tokens) {
-      if (token && token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
-      return;
-    }
+//   token.sizeMattersGridTicker = () => {
+//     if (!token || !token.document || !token.center || !canvas || !canvas.tokens) {
+//       if (token && token.sizeMattersGridTicker) {
+//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+//         token.sizeMattersGridTicker = null;
+//       }
+//       return;
+//     }
 
-    if (!canvas.tokens.placeables.includes(token)) {
-      if (token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
-      return;
-    }
+//     if (!canvas.tokens.placeables.includes(token)) {
+//       if (token.sizeMattersGridTicker) {
+//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+//         token.sizeMattersGridTicker = null;
+//       }
+//       return;
+//     }
 
-    try {
-      const centerX = token.center.x;
-      const centerY = token.center.y;
-      const tokenRotation = Math.toRadians(token.document.rotation || 0);
+//     try {
+//       const centerX = token.center.x;
+//       const centerY = token.center.y;
+//       const tokenRotation = Math.toRadians(token.document.rotation || 0);
 
-      if (token.sizeMattersImage && token.sizeMattersImage.parent) {
-        let offsetX = settings.imageOffsetX || 0;
-        let offsetY = settings.imageOffsetY || 0;
+//       if (token.sizeMattersImage && token.sizeMattersImage.parent) {
+//         let offsetX = settings.imageOffsetX || 0;
+//         let offsetY = settings.imageOffsetY || 0;
 
-        if (tokenRotation !== 0) {
-          const cos = Math.cos(tokenRotation);
-          const sin = Math.sin(tokenRotation);
-          const rotatedX = offsetX * cos - offsetY * sin;
-          const rotatedY = offsetX * sin + offsetY * cos;
-          offsetX = rotatedX;
-          offsetY = rotatedY;
-        }
+//         if (tokenRotation !== 0) {
+//           const cos = Math.cos(tokenRotation);
+//           const sin = Math.sin(tokenRotation);
+//           const rotatedX = offsetX * cos - offsetY * sin;
+//           const rotatedY = offsetX * sin + offsetY * cos;
+//           offsetX = rotatedX;
+//           offsetY = rotatedY;
+//         }
 
-        token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
+//         token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
 
-        const imageRotation = Math.toRadians(settings.imageRotation || 0);
-        token.sizeMattersImage.rotation = tokenRotation + imageRotation;
+//         const imageRotation = Math.toRadians(settings.imageRotation || 0);
+//         token.sizeMattersImage.rotation = tokenRotation + imageRotation;
 
-        token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
-      }
-    } catch (error) {
-      console.warn("Size Matters: Error in ticker, removing ticker", error);
-      if (token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
-    }
-  };
+//         token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+//       }
+//     } catch (error) {
+//       console.warn("Size Matters: Error in ticker, removing ticker", error);
+//       if (token.sizeMattersGridTicker) {
+//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
+//         token.sizeMattersGridTicker = null;
+//       }
+//     }
+//   };
 
-  canvas.app.ticker.add(token.sizeMattersGridTicker);
-}
+//   canvas.app.ticker.add(token.sizeMattersGridTicker);
+// }
 
 function setupTicker(token, settings) {
-  // Safe ticker removal
   if (token.sizeMattersGridTicker) {
-    try {
-      canvas.app.ticker.remove(token.sizeMattersGridTicker);
-    } catch (error) {
-      console.warn("Size Matters: Error removing ticker", error);
-    }
+    canvas.app.ticker.remove(token.sizeMattersGridTicker);
   }
 
   token.sizeMattersGridTicker = () => {
-    if (!token || !token.document || !token.center || !canvas || !canvas.tokens) {
+    // Verifica se o token e nosso contêiner ainda existem.
+    if (!token || !token.document || !token.center || !token.sizeMattersContainer || !token.sizeMattersContainer.parent) {
       if (token && token.sizeMattersGridTicker) {
         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
         token.sizeMattersGridTicker = null;
@@ -258,53 +272,40 @@ function setupTicker(token, settings) {
       return;
     }
 
-    if (!canvas.tokens.placeables.includes(token)) {
-      if (token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
-      return;
+    const container = token.sizeMattersContainer;
+    const tokenRotation = Math.toRadians(token.document.rotation || 0);
+
+    // 1. POSICIONA O CONTÊINER INTEIRO
+    // O contêiner é movido para o centro exato do token.
+    container.position.set(token.center.x, token.center.y);
+    container.rotation = tokenRotation;
+    container.visible = token.visible;
+
+    // 2. POSICIONA OS GRÁFICOS DENTRO DO CONTÊINER
+    // A posição deles agora é relativa ao centro do contêiner (que é o centro do token).
+    
+    if (token.sizeMattersGrid) {
+      token.sizeMattersGrid.visible = (settings.gridVisible !== false);
+      // O grid fica em (0,0) dentro do contêiner, pois já é desenhado em volta do centro.
+      token.sizeMattersGrid.position.set(0, 0);
     }
 
-    try {
-      const centerX = token.center.x;
-      const centerY = token.center.y;
-      const tokenRotation = Math.toRadians(token.document.rotation || 0);
-
-      if (token.sizeMattersGrid && token.sizeMattersGrid.parent) {
-        token.sizeMattersGrid.position.set(centerX, centerY);
-        token.sizeMattersGrid.rotation = tokenRotation;
-      }
-
-      if (token.sizeMattersImage && token.sizeMattersImage.parent) {
-        let offsetX = settings.imageOffsetX || 0;
-        let offsetY = settings.imageOffsetY || 0;
-
-        if (tokenRotation !== 0) {
-          const cos = Math.cos(tokenRotation);
-          const sin = Math.sin(tokenRotation);
-          const rotatedX = offsetX * cos - offsetY * sin;
-          const rotatedY = offsetX * sin + offsetY * cos;
-          offsetX = rotatedX;
-          offsetY = rotatedY;
-        }
-
-        token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
-
-        const imageRotation = Math.toRadians(settings.imageRotation || 0);
-        token.sizeMattersImage.rotation = tokenRotation + imageRotation;
-
-        token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
-      }
-    } catch (error) {
-      console.warn("Size Matters: Error in ticker, removing ticker", error);
-      if (token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
+    if (token.sizeMattersImage) {
+      token.sizeMattersImage.visible = (settings.imageVisible !== false);
+      token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+      
+      // O offset da imagem é aplicado a partir do centro (0,0) do contêiner.
+      const offsetX = settings.imageOffsetX || 0;
+      const offsetY = settings.imageOffsetY || 0;
+      token.sizeMattersImage.position.set(offsetX, offsetY);
+      
+      // A rotação da imagem é relativa à rotação do contêiner.
+      token.sizeMattersImage.rotation = Math.toRadians(settings.imageRotation || 0);
     }
   };
 
+  // Executa uma vez para posicionar imediatamente.
+  token.sizeMattersGridTicker();
   canvas.app.ticker.add(token.sizeMattersGridTicker);
 }
 
@@ -1092,7 +1093,7 @@ class SizeMattersApp extends Application {
 
   async openFilePicker(html) {
     const fp = new FilePicker({
-      type: "image",
+      type: "media",
       current: this.settings.imageUrl,
       callback: (path) => {
         this.settings.imageUrl = path;
@@ -1153,41 +1154,6 @@ class SizeMattersApp extends Application {
 
   async handleRideButton(html) {
     openRideManager();
-  }
-
-  toggleImageVisibility() {
-    if (!this.token) {
-      ui.notifications.warn("Select a token first!");
-      return;
-    }
-    const currentToken = canvas.tokens.get(this.tokenId);
-    this.settings.imageVisible = !this.settings.imageVisible;
-    this.saveSettings();
-    if (currentToken && currentToken.sizeMattersImage) {
-      currentToken.sizeMattersImage.visible = this.settings.imageVisible;
-      ui.notifications.info(`Image ${this.settings.imageVisible ? 'shown' : 'hidden'}`);
-    } else if (this.settings.imageUrl && this.settings.imageUrl.trim()) {
-      this.drawGrid();
-      ui.notifications.info(`Image ${this.settings.imageVisible ? 'shown' : 'hidden'}`);
-    } else {
-      ui.notifications.warn("No image has been loaded!");
-    }
-  }
-
-  toggleGridVisibility() {
-    if (!this.token) {
-      ui.notifications.warn("Select a token first!");
-      return;
-    }
-    const currentToken = canvas.tokens.get(this.tokenId);
-    this.settings.gridVisible = !this.settings.gridVisible;
-    this.saveSettings();
-    if (currentToken && currentToken.sizeMattersGrid) {
-      currentToken.sizeMattersGrid.visible = this.settings.gridVisible;
-      ui.notifications.info(`Grid ${this.settings.gridVisible ? 'shown' : 'hidden'}`);
-    } else {
-      ui.notifications.warn("No grid has been drawn!");
-    }
   }
 
   clearTokenGraphics() {

@@ -69,6 +69,8 @@
     <div class="checkbox-row">
       <label><input type="checkbox" name="enableContour" {{#if enableContour}}checked{{/if}}> Outline</label>
       <label><input type="checkbox" name="enableFill" {{#if enableFill}}checked{{/if}}> Fill</label>
+      <label><input type="checkbox" name="imageVisible" {{#if imageVisible}}checked{{/if}}> Image</label>
+      <label><input type="checkbox" name="gridVisible" {{#if gridVisible}}checked{{/if}}> Grid</label>
     </div>
   </div>
 
@@ -79,12 +81,6 @@
     </button>
     <button type="button" class="action-btn clear-button">
       <i class="fas fa-eraser"></i> Clear
-    </button>
-    <button type="button" class="action-btn toggle-image-button">
-      <i class="fas fa-image"></i> Image
-    </button>
-    <button type="button" class="action-btn toggle-grid-button">
-      <i class="fas fa-th-large"></i> Grid
     </button>
   </div>
 </form>

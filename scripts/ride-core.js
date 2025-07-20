@@ -1,284 +1,186 @@
-// Core ride functionality for Size Matters module
-// Otimizado para FoundryVTT v13 com melhor performance e movimento suave
+/**
+ * Size Matters Module - Token Ride System
+ * 
+ * This module provides functionality for tokens to follow a leader token in formation,
+ * maintaining relative positions and rotations during movement.
+ * 
+ * Key Features:
+ * - Leader/follower token relationships
+ * - Automatic position and rotation synchronization
+ * - Persistent rides across scene reloads
+ * - Batch token updates for performance
+ * - Quick toggle functionality for temporary formations
+ */
 
+// Global storage for active rides
 window.sizeMattersActiveRides = window.sizeMattersActiveRides || new Map();
 
-const RIDE_CONFIG = {
-  TICKER_THROTTLE_MS: 16,
-  BATCH_UPDATE_DELAY: 32,
-  MIN_MOVEMENT_THRESHOLD: 0.5,
-  MIN_ROTATION_THRESHOLD: 0.1,
-  MAX_FOLLOWERS_PER_BATCH: 10,
-  SMOOTHING_FACTOR: 0.8
-};
-
-const tokenCache = new Map();
-const updateQueue = new Map();
-
-function getTokenFromCache(tokenId) {
-  if (!tokenCache.has(tokenId)) {
-    const token = canvas.tokens.get(tokenId);
-    if (token) {
-      tokenCache.set(tokenId, token);
-    }
-    return token;
-  }
-  return tokenCache.get(tokenId);
-}
-
-function clearTokenCache() {
-  tokenCache.clear();
-}
-
-function queueTokenUpdate(tokenId, updateData) {
-  if (!updateQueue.has(tokenId)) {
-    updateQueue.set(tokenId, updateData);
-  } else {
-    Object.assign(updateQueue.get(tokenId), updateData);
-  }
-}
-
-async function processBatchUpdates() {
-  if (updateQueue.size === 0) return;
-  
-  const updates = Array.from(updateQueue.entries());
-  updateQueue.clear();
-  
-  const chunks = [];
-  for (let i = 0; i < updates.length; i += RIDE_CONFIG.MAX_FOLLOWERS_PER_BATCH) {
-    chunks.push(updates.slice(i, i + RIDE_CONFIG.MAX_FOLLOWERS_PER_BATCH));
-  }
-  
-  for (const chunk of chunks) {
-    const updatePromises = chunk.map(([tokenId, updateData]) => {
-      const token = getTokenFromCache(tokenId);
-      if (token?.document) {
-        return token.document.update(updateData, { 
-          animate: false,
-          broadcast: true,
-          render: false
-        }).catch(err => {
-          console.warn(`Size Matters | Failed to update token ${tokenId}`, err);
-        });
-      }
-      return Promise.resolve();
-    });
-    await Promise.all(updatePromises);
-  }
-  
-  canvas.tokens.refresh();
-}
-
-function createRideTicker(leaderId, rideData) {
-  let lastUpdateTime = 0;
-  let lastBatchTime = 0;
-  let isProcessing = false;
-  let wasMoving = false;
-
-  let lastLeaderActualX = rideData.lastX;
-  let lastLeaderActualY = rideData.lastY;
-  let lastLeaderActualRotation = rideData.lastRotation;
-  
-  const snapFollowersToFinalPosition = async (leaderToken) => {
-    const finalX = leaderToken.document.x;
-    const finalY = leaderToken.document.y;
-    const finalRotation = leaderToken.document.rotation || 0;
-
+/**
+ * Creates a Foundry hook that monitors leader token updates and moves followers accordingly
+ * 
+ * @param {string} leaderId - The ID of the leader token
+ * @param {Map} followersData - Map of follower IDs to their relative position data
+ * @returns {number} Hook ID for later removal
+ */
+function createFollowHook(leaderId, followersData) {
+  return Hooks.on("updateToken", (tokenDocument, updateData) => {
+    // Only process updates for the leader token
+    if (tokenDocument.id !== leaderId) return;
+    
     const gridSize = canvas.grid.size;
-    const leaderCenterX = finalX + (leaderToken.document.width * gridSize) / 2;
-    const leaderCenterY = finalY + (leaderToken.document.height * gridSize) / 2;
-    const finalLeaderRotationRad = (finalRotation * Math.PI) / 180;
-
-    const sinRotation = Math.sin(finalLeaderRotationRad);
-    const cosRotation = Math.cos(finalLeaderRotationRad);
-
-    rideData.followers.forEach((followerData, followerId) => {
-      const followerToken = getTokenFromCache(followerId);
-      if (followerToken?.document) {
-        const rotatedDx = followerData.relativeDx * cosRotation - followerData.relativeDy * sinRotation;
-        const rotatedDy = followerData.relativeDx * sinRotation + followerData.relativeDy * cosRotation;
-        
-        const newFollowerCenterX = leaderCenterX + rotatedDx;
-        const newFollowerCenterY = leaderCenterY + rotatedDy;
-        
-        const newFollowerX = newFollowerCenterX - followerData.followerWidth / 2;
-        const newFollowerY = newFollowerCenterY - followerData.followerHeight / 2;
-        const newFollowerRotation = finalRotation + followerData.relativeRotationOffset;
-        
-        queueTokenUpdate(followerId, { x: newFollowerX, y: newFollowerY, rotation: newFollowerRotation });
-      }
+    
+    // Calculate leader's new center position
+    const leaderCenterX = (updateData.x ?? tokenDocument.x) + (tokenDocument.width * gridSize) / 2;
+    const leaderCenterY = (updateData.y ?? tokenDocument.y) + (tokenDocument.height * gridSize) / 2;
+    
+    // Get rotation in radians for trigonometric calculations
+    const rotation = ((updateData.rotation ?? tokenDocument.rotation) * Math.PI) / 180;
+    const sinRotation = Math.sin(rotation);
+    const cosRotation = Math.cos(rotation);
+    
+    // Calculate new positions for all followers
+    const followerUpdates = [];
+    followersData.forEach((followerData, followerId) => {
+      // Apply rotation transformation to relative position
+      const rotatedX = followerData.relativeDx * cosRotation - followerData.relativeDy * sinRotation;
+      const rotatedY = followerData.relativeDx * sinRotation + followerData.relativeDy * cosRotation;
+      
+      // Calculate follower's new position (top-left corner for Foundry positioning)
+      const newFollowerX = leaderCenterX + rotatedX - followerData.followerWidth / 2;
+      const newFollowerY = leaderCenterY + rotatedY - followerData.followerHeight / 2;
+      
+      followerUpdates.push({
+        _id: followerId,
+        x: newFollowerX,
+        y: newFollowerY,
+        rotation: updateData.rotation ?? tokenDocument.rotation
+      });
     });
-
-    await processBatchUpdates();
-    rideData.lastX = finalX;
-    rideData.lastY = finalY;
-    rideData.lastRotation = finalRotation;
-  };
-
-  return async () => {
-    const currentTime = Date.now();
-    if (currentTime - lastUpdateTime < RIDE_CONFIG.TICKER_THROTTLE_MS) return;
-    if (isProcessing) return;
-
-    try {
-      isProcessing = true;
-      lastUpdateTime = currentTime;
-
-      const leaderToken = getTokenFromCache(leaderId);
-      if (!leaderToken?.document) {
-        stopTokenRide(leaderToken, true);
-        return;
-      }
-
-      const currentX = leaderToken.document.x;
-      const currentY = leaderToken.document.y;
-      const currentRotation = leaderToken.document.rotation || 0;
-      
-      const deltaX = Math.abs(currentX - lastLeaderActualX);
-      const deltaY = Math.abs(currentY - lastLeaderActualY);
-      const deltaRotation = Math.abs(currentRotation - lastLeaderActualRotation);
-      
-      const isMoving = deltaX >= RIDE_CONFIG.MIN_MOVEMENT_THRESHOLD || 
-                       deltaY >= RIDE_CONFIG.MIN_MOVEMENT_THRESHOLD || 
-                       deltaRotation >= RIDE_CONFIG.MIN_ROTATION_THRESHOLD;
-
-      if (isMoving) {
-        wasMoving = true;
-        lastLeaderActualX = currentX;
-        lastLeaderActualY = currentY;
-        lastLeaderActualRotation = currentRotation;
-
-        const smoothX = rideData.lastX + (currentX - rideData.lastX) * RIDE_CONFIG.SMOOTHING_FACTOR;
-        const smoothY = rideData.lastY + (currentY - rideData.lastY) * RIDE_CONFIG.SMOOTHING_FACTOR;
-        const smoothRotation = rideData.lastRotation + (currentRotation - rideData.lastRotation) * RIDE_CONFIG.SMOOTHING_FACTOR;
-        
-        rideData.lastX = smoothX;
-        rideData.lastY = smoothY;
-        rideData.lastRotation = smoothRotation;
-
-        const gridSize = canvas.grid.size;
-        const leaderCenterX = smoothX + (leaderToken.document.width * gridSize) / 2;
-        const leaderCenterY = smoothY + (leaderToken.document.height * gridSize) / 2;
-        const currentLeaderRotationRad = (smoothRotation * Math.PI) / 180;
-
-        const sinRotation = Math.sin(currentLeaderRotationRad);
-        const cosRotation = Math.cos(currentLeaderRotationRad);
-
-        rideData.followers.forEach((followerData, followerId) => {
-          const followerToken = getTokenFromCache(followerId);
-          if (followerToken?.document) {
-            const rotatedDx = followerData.relativeDx * cosRotation - followerData.relativeDy * sinRotation;
-            const rotatedDy = followerData.relativeDx * sinRotation + followerData.relativeDy * cosRotation;
-            
-            const newFollowerCenterX = leaderCenterX + rotatedDx;
-            const newFollowerCenterY = leaderCenterY + rotatedDy;
-            
-            const newFollowerX = newFollowerCenterX - followerData.followerWidth / 2;
-            const newFollowerY = newFollowerCenterY - followerData.followerHeight / 2;
-            const newFollowerRotation = smoothRotation + followerData.relativeRotationOffset;
-            
-            queueTokenUpdate(followerId, { x: newFollowerX, y: newFollowerY, rotation: newFollowerRotation });
-          }
-        });
-        
-        if (currentTime - lastBatchTime >= RIDE_CONFIG.BATCH_UPDATE_DELAY) {
-          lastBatchTime = currentTime;
-          await processBatchUpdates();
-        }
-      } else if (wasMoving) {
-        wasMoving = false;
-        await snapFollowersToFinalPosition(leaderToken);
-      }
-    } catch (error) {
-      console.warn("Size Matters | Ride ticker error:", error);
-    } finally {
-      isProcessing = false;
+    
+    // Perform batch update for better performance
+    if (followerUpdates.length > 0) {
+      canvas.scene.updateEmbeddedDocuments("Token", followerUpdates, {
+        animate: false,
+        broadcast: true
+      }).catch(error => {
+        console.warn("Size Matters | Failed to update followers:", error);
+      });
     }
-  };
+  });
 }
 
+/**
+ * Starts a new token ride with the specified leader and followers
+ * 
+ * @param {Token} leaderToken - The leader token object
+ * @param {Map} followersMap - Map of follower token IDs to their data
+ * @returns {Promise<string>} The ride ID
+ * @throws {Error} If leader token is invalid or no valid followers found
+ */
 async function startTokenRide(leaderToken, followersMap) {
-  if (!leaderToken?.document) throw new Error("Invalid leader token");
+  if (!leaderToken?.document) {
+    throw new Error("Invalid leader token");
+  }
 
+  // Stop any existing ride for this leader
   await stopTokenRide(leaderToken, true);
-  clearTokenCache();
 
   const rideId = `ride_${leaderToken.id}_${Date.now()}`;
   const gridSize = canvas.grid.size;
   
+  // Calculate leader's current center position
   const leaderCenterX = leaderToken.document.x + (leaderToken.document.width * gridSize) / 2;
   const leaderCenterY = leaderToken.document.y + (leaderToken.document.height * gridSize) / 2;
-  const leaderRotation = leaderToken.document.rotation || 0;
 
-  const enhancedFollowersMap = new Map();
+  // Process followers and calculate their relative positions from leader
+  const processedFollowers = new Map();
+  
   for (const [followerId, followerData] of followersMap) {
-    const followerToken = getTokenFromCache(followerId);
-    if (followerToken?.document) {
-      const followerWidth = followerToken.document.width * gridSize;
-      const followerHeight = followerToken.document.height * gridSize;
-      const followerCenterX = followerToken.document.x + followerWidth / 2;
-      const followerCenterY = followerToken.document.y + followerHeight / 2;
-      const followerRotation = followerToken.document.rotation || 0;
-      
-      enhancedFollowersMap.set(followerId, {
-        ...followerData,
-        relativeDx: followerCenterX - leaderCenterX,
-        relativeDy: followerCenterY - leaderCenterY,
-        followerWidth,
-        followerHeight,
-        relativeRotationOffset: followerRotation - leaderRotation
-      });
+    const followerToken = canvas.tokens.get(followerId);
+    if (!followerToken?.document) {
+      console.warn(`Size Matters | Follower token ${followerId} not found`);
+      continue;
     }
+
+    const followerWidth = followerToken.document.width * gridSize;
+    const followerHeight = followerToken.document.height * gridSize;
+    const followerCenterX = followerToken.document.x + followerWidth / 2;
+    const followerCenterY = followerToken.document.y + followerHeight / 2;
+    
+    // Calculate relative position from leader to follower
+    const relativeDx = followerCenterX - leaderCenterX;
+    const relativeDy = followerCenterY - leaderCenterY;
+    
+    processedFollowers.set(followerId, {
+      ...followerData,
+      relativeDx,
+      relativeDy,
+      followerWidth,
+      followerHeight,
+      name: followerToken.name
+    });
   }
 
+  if (processedFollowers.size === 0) {
+    throw new Error("No valid followers found");
+  }
+
+  // Create the follow hook
+  const hookId = createFollowHook(leaderToken.id, processedFollowers);
+
+  // Store ride data in global storage
   const rideData = {
     leaderId: leaderToken.id,
     leaderName: leaderToken.name,
-    followers: enhancedFollowersMap,
-    lastX: leaderToken.document.x,
-    lastY: leaderToken.document.y,
-    lastRotation: leaderRotation,
-    tickerFunction: null
+    followers: processedFollowers,
+    hookId: hookId,
+    startTime: Date.now()
   };
 
-  const tickerFunction = createRideTicker(leaderToken.id, rideData);
-  rideData.tickerFunction = tickerFunction;
-  
-  if (!canvas.app?.ticker) throw new Error("PIXI ticker not available");
-  
-  canvas.app.ticker.add(tickerFunction);
   window.sizeMattersActiveRides.set(rideId, rideData);
 
+  // Set flags for persistence across scene reloads
   try {
     const followersObj = {};
-    enhancedFollowersMap.forEach((value, key) => { followersObj[key] = { ...value }; });
+    processedFollowers.forEach((value, key) => {
+      followersObj[key] = { ...value };
+    });
     
     await leaderToken.document.setFlag('size-matters', 'activeRideId', rideId);
     await leaderToken.document.setFlag('size-matters', 'rideFollowers', followersObj);
   } catch (error) {
-    canvas.app.ticker.remove(tickerFunction);
+    // Cleanup on failure
+    Hooks.off("updateToken", hookId);
     window.sizeMattersActiveRides.delete(rideId);
     throw new Error("Failed to set leader token flags: " + error.message);
   }
 
-  ui.notifications.info(`Ride started! ${enhancedFollowersMap.size} follower(s) now following.`);
+  ui.notifications.info(`Ride started! ${processedFollowers.size} follower(s) now following ${leaderToken.name}.`);
   return rideId;
 }
 
+/**
+ * Stops an active token ride and cleans up associated data
+ * 
+ * @param {Token} leaderToken - The leader token object
+ * @param {boolean} suppressNotification - Whether to suppress the stop notification
+ */
 async function stopTokenRide(leaderToken, suppressNotification = false) {
   if (!leaderToken?.document) return;
 
   const rideId = leaderToken.document.getFlag('size-matters', 'activeRideId');
-  if (rideId && window.sizeMattersActiveRides.has(rideId)) {
+  if (!rideId) return;
+
+  // Remove from active rides and unhook
+  if (window.sizeMattersActiveRides.has(rideId)) {
     const rideData = window.sizeMattersActiveRides.get(rideId);
-    if (canvas.app?.ticker && rideData.tickerFunction) {
-      canvas.app.ticker.remove(rideData.tickerFunction);
+    if (rideData.hookId) {
+      Hooks.off("updateToken", rideData.hookId);
     }
     window.sizeMattersActiveRides.delete(rideId);
   }
 
-  await processBatchUpdates();
-
+  // Clean up persistence flags
   try {
     await leaderToken.document.unsetFlag('size-matters', 'activeRideId');
     await leaderToken.document.unsetFlag('size-matters', 'rideFollowers');
@@ -291,6 +193,13 @@ async function stopTokenRide(leaderToken, suppressNotification = false) {
   }
 }
 
+/**
+ * Removes a specific follower from an active ride
+ * 
+ * @param {Token} leaderToken - The leader token object
+ * @param {string} followerId - The ID of the follower to remove
+ * @returns {Promise<boolean>} True if follower was removed, false if ride was stopped
+ */
 async function removeFollowerFromTokenRide(leaderToken, followerId) {
   if (!leaderToken?.document) return false;
 
@@ -300,23 +209,34 @@ async function removeFollowerFromTokenRide(leaderToken, followerId) {
   const rideData = window.sizeMattersActiveRides.get(rideId);
   if (!rideData.followers.has(followerId)) return false;
 
+  const followerName = rideData.followers.get(followerId).name;
   rideData.followers.delete(followerId);
-  tokenCache.delete(followerId);
 
+  // If no followers left, stop the entire ride
   if (rideData.followers.size === 0) {
     await stopTokenRide(leaderToken);
     return false;
   } else {
+    // Recreate the hook with updated followers
+    Hooks.off("updateToken", rideData.hookId);
+    rideData.hookId = createFollowHook(leaderToken.id, rideData.followers);
+    
+    // Update persistence flags
     const followersObj = {};
-    rideData.followers.forEach((value, key) => { followersObj[key] = { ...value }; });
+    rideData.followers.forEach((value, key) => {
+      followersObj[key] = { ...value };
+    });
+    
     await leaderToken.document.setFlag('size-matters', 'rideFollowers', followersObj);
     
-    const followerToken = getTokenFromCache(followerId);
-    ui.notifications.info(`${followerToken?.name || "Token"} no longer follows the leader.`);
+    ui.notifications.info(`${followerName} no longer follows the leader.`);
     return true;
   }
 }
 
+/**
+ * Stops all active token rides
+ */
 async function stopAllTokenRides() {
   const rideIds = Array.from(window.sizeMattersActiveRides.keys());
   if (rideIds.length === 0) return;
@@ -324,17 +244,20 @@ async function stopAllTokenRides() {
   for (const rideId of rideIds) {
     const rideData = window.sizeMattersActiveRides.get(rideId);
     if (rideData) {
-      const leaderToken = getTokenFromCache(rideData.leaderId);
+      const leaderToken = canvas.tokens.get(rideData.leaderId);
       if (leaderToken) {
         await stopTokenRide(leaderToken, true);
       }
     }
   }
   
-  clearTokenCache();
   ui.notifications.info("All active rides have been stopped!");
 }
 
+/**
+ * Restores rides from token flags after scene reload
+ * Called automatically on canvas ready
+ */
 async function restoreRidesFromFlags() {
   if (!canvas?.tokens) return;
   
@@ -351,33 +274,137 @@ async function restoreRidesFromFlags() {
           ui.notifications.info(`Ride restored: ${token.name} with ${followersMap.size} follower(s).`);
         } catch (error) {
           console.warn(`Size Matters | Failed to restore ride for leader ${token.id}`, error);
+          // Clean up invalid flags on restoration failure
           try {
             await token.document.unsetFlag('size-matters', 'activeRideId');
             await token.document.unsetFlag('size-matters', 'rideFollowers');
-          } catch (flagError) { /* Silent */ }
+          } catch (flagError) {
+            // Silent fail for flag cleanup
+          }
         }
       } else {
+        // Clean up empty rides
         try {
           await token.document.unsetFlag('size-matters', 'activeRideId');
           await token.document.unsetFlag('size-matters', 'rideFollowers');
-        } catch (flagError) { /* Silent */ }
+        } catch (flagError) {
+          // Silent fail for flag cleanup
+        }
       }
     }
   }
 }
 
+/**
+ * Gets information about all active ride groups
+ * 
+ * @returns {Map} Map of leader IDs to their ride information
+ */
+function getActiveRideGroups() {
+  const activeGroups = new Map();
+  window.sizeMattersActiveRides.forEach((rideData) => {
+    activeGroups.set(rideData.leaderId, {
+      leaderName: rideData.leaderName,
+      followers: rideData.followers
+    });
+  });
+  return activeGroups;
+}
+
+/**
+ * Quick toggle function for temporary formations
+ * Select multiple tokens (followers first, leader last) and run this function
+ * Run again to disable
+ */
+window.toggleQuickFollow = function() {
+  // If already active, turn off
+  if (window.quickFollowHook) {
+    Hooks.off("updateToken", window.quickFollowHook);
+    delete window.quickFollowHook;
+    ui.notifications.info("Quick Follow disabled");
+    return;
+  }
+  
+  const selectedTokens = canvas.tokens.controlled;
+  const leader = selectedTokens.at(-1);
+  
+  if (selectedTokens.length < 2) {
+    ui.notifications.warn("Select followers first, then leader last (Ctrl+click)");
+    return;
+  }
+  
+  const gridSize = canvas.grid.size;
+  const followers = selectedTokens.slice(0, -1).map(token => ({
+    id: token.id,
+    width: token.document.width * gridSize,
+    height: token.document.height * gridSize,
+    dx: token.center.x - leader.center.x,
+    dy: token.center.y - leader.center.y
+  }));
+  
+  // Create temporary hook for quick follow
+  window.quickFollowHook = Hooks.on("updateToken", (tokenDocument, updateData) => {
+    if (tokenDocument.id !== leader.id) return;
+    
+    const rotation = ((updateData.rotation ?? tokenDocument.rotation) * Math.PI) / 180;
+    const sinRotation = Math.sin(rotation);
+    const cosRotation = Math.cos(rotation);
+    const centerX = (updateData.x ?? tokenDocument.x) + tokenDocument.width * gridSize / 2;
+    const centerY = (updateData.y ?? tokenDocument.y) + tokenDocument.height * gridSize / 2;
+    
+    const updates = followers.map(follower => ({
+      _id: follower.id,
+      x: centerX + follower.dx * cosRotation - follower.dy * sinRotation - follower.width / 2,
+      y: centerY + follower.dx * sinRotation + follower.dy * cosRotation - follower.height / 2,
+      rotation: updateData.rotation ?? tokenDocument.rotation
+    }));
+    
+    canvas.scene.updateEmbeddedDocuments("Token", updates, { animate: false });
+  });
+  
+  ui.notifications.info("Quick Follow enabled! Select followers, then leader (last).");
+};
+
+// ================================
+// FOUNDRY HOOKS REGISTRATION
+// ================================
+
+/**
+ * Handles scene initialization - stops all rides and restores from flags
+ */
 Hooks.on('canvasReady', () => {
-  clearTokenCache();
   stopAllTokenRides().then(() => restoreRidesFromFlags());
 });
 
+/**
+ * Handles token deletion - cleans up rides involving deleted tokens
+ */
 Hooks.on('deleteToken', (tokenDocument) => {
-  tokenCache.delete(tokenDocument.id);
+  // If a leader is deleted, stop their ride
+  const rideData = Array.from(window.sizeMattersActiveRides.values())
+    .find(ride => ride.leaderId === tokenDocument.id);
+  
+  if (rideData) {
+    const leaderToken = canvas.tokens.get(rideData.leaderId);
+    if (leaderToken) {
+      stopTokenRide(leaderToken, true);
+    }
+  }
+  
+  // If a follower is deleted, remove them from any ride
+  for (const [rideId, rideData] of window.sizeMattersActiveRides.entries()) {
+    if (rideData.followers.has(tokenDocument.id)) {
+      const leaderToken = canvas.tokens.get(rideData.leaderId);
+      if (leaderToken) {
+        removeFollowerFromTokenRide(leaderToken, tokenDocument.id);
+      }
+    }
+  }
 });
 
-Hooks.on('updateToken', (tokenDocument) => {
-  tokenCache.delete(tokenDocument.id);
-});
+// ================================
+// EXPORTS
+// ================================
 
 export {
   startTokenRide,
@@ -387,14 +414,3 @@ export {
   stopAllTokenRides,
   restoreRidesFromFlags
 };
-
-function getActiveRideGroups() {
-    const activeGroups = new Map();
-    window.sizeMattersActiveRides.forEach((rideData) => {
-        activeGroups.set(rideData.leaderId, {
-            leaderName: rideData.leaderName,
-            followers: rideData.followers
-        });
-    });
-    return activeGroups;
-}
