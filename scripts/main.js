@@ -93,8 +93,7 @@ async function drawSizeMattersGraphicsForToken(token) {
 
 
 
-// Simple texture cache function
-// Simple texture cache function
+// Retrieve textures with caching and size limits
 async function getTexture(url) {
   if (textureCache.has(url)) {
     return textureCache.get(url);
