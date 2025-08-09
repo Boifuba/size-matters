@@ -1,376 +1,20 @@
-// Import ride functionality
-// Import ride restoration function
 import {
   startTokenRide,
   stopTokenRide,
   removeFollowerFromTokenRide,
   getActiveRideGroups,
   stopAllTokenRides,
-  restoreRidesFromFlags
+  restoreRidesFromFlags,
+  createRideFromSelection,
+  showRideManagementDialog
 } from './ride-core.js';
-
-// Simple texture cache
-const textureCache = new Map();
-const MAX_CACHE_SIZE = 50;
-
-// Utility functions moved outside the class for global access
-function axialToPixel(q, r, radius, pointy) {
-  return pointy
-    ? { x: radius * Math.sqrt(3) * (q + r / 2), y: radius * 1.5 * r }
-    : { x: radius * 1.5 * q, y: radius * Math.sqrt(3) * (r + q / 2) };
-}
-
-function squareToPixel(x, y, size) {
-  return { x: x * size, y: y * size };
-}
-
-function drawHex(g, cx, cy, r, pointy) {
-  const startAngle = pointy ? -Math.PI / 2 : 0;
-  g.moveTo(cx + r * Math.cos(startAngle), cy + r * Math.sin(startAngle));
-  for (let i = 1; i <= 6; i++) {
-    const angle = startAngle + i * Math.PI / 3;
-    g.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-  }
-}
-
-function drawSquare(g, x, y, size) {
-  g.drawRect(x, y, size, size);
-}
-
-// Global function to draw Size Matters graphics for a token
-
-async function drawSizeMattersGraphicsForToken(token) {
-  if (!token || !token.document) return;
-
-  const settings = token.document.getFlag('size-matters', 'settings');
-  if (!settings) return;
-
-  clearTokenSizeMattersGraphics(token);
-
-  // 1. CRIA UM CONTÊINER PARA TODOS OS GRÁFICOS
-  // Este contêiner será movido pelo ticker.
-  token.sizeMattersContainer = new PIXI.Container();
-
-  // 2. ADICIONA O CONTÊINER À CAMADA CORRETA
-  // A camada 'primary' fica abaixo da visão ('effects').
-  canvas.primary.addChild(token.sizeMattersContainer);
-
-  // Handle image sprite
-  if (settings.imageUrl && settings.imageUrl.trim()) {
-    try {
-      const texture = await getTexture(settings.imageUrl);
-      if (texture) {
-        token.sizeMattersImage = new PIXI.Sprite(texture);
-        token.sizeMattersImage.anchor.set(0.5, 0.5);
-        
-        // 3. Adiciona a imagem DENTRO do nosso contêiner
-        token.sizeMattersContainer.addChild(token.sizeMattersImage);
-      }
-    } catch (error) {
-      console.warn("Size Matters: Failed to load image for token", token.id, error);
-    }
-  }
-
-  // Handle grid graphics
-  const selectedCells = Object.values(settings.grid || {}).filter(h => h.selected);
-  if (selectedCells.length > 0) {
-    token.sizeMattersGrid = createGridGraphics(settings, settings.grid);
-    
-    // 4. Adiciona o grid DENTRO do nosso contêiner
-    token.sizeMattersContainer.addChild(token.sizeMattersGrid);
-  }
-
-  // Se o contêiner tem algo dentro, ativa o ticker para posicioná-lo.
-  if (token.sizeMattersContainer.children.length > 0) {
-    setupTicker(token, settings);
-  } else {
-    // Se não há nada para desenhar, limpa o contêiner vazio.
-    clearTokenSizeMattersGraphics(token);
-  }
-}
-
-
-
-
-
-// Simple texture cache function
-// Simple texture cache function
-async function getTexture(url) {
-  if (textureCache.has(url)) {
-    return textureCache.get(url);
-  }
-
-  try {
-    // Carrega a textura da URL
-    const texture = await PIXI.Texture.fromURL(url);
-    
-    // NOVO: Verifica se a textura tem um recurso de vídeo (como .webm)
-    if (texture.baseTexture.resource && texture.baseTexture.resource.source) {
-      const videoSource = texture.baseTexture.resource.source;
-      
-      // Verifica se é um elemento de vídeo HTML
-      if (videoSource instanceof HTMLVideoElement) {
-        videoSource.loop = true; // <<< AQUI ESTÁ A MÁGICA!
-        videoSource.muted = true; // Necessário para autoplay na maioria dos navegadores
-        await videoSource.play();      // Inicia a reprodução da animação
-      }
-    }
-    
-    // Gerencia o tamanho do cache
-    if (textureCache.size >= MAX_CACHE_SIZE) {
-      const firstKey = textureCache.keys().next().value;
-      const oldTexture = textureCache.get(firstKey);
-      oldTexture.destroy(true);
-      textureCache.delete(firstKey);
-    }
-    
-    textureCache.set(url, texture);
-    return texture;
-  } catch (error) {
-    console.warn("Size Matters: Failed to load texture", url, error);
-    return null;
-  }
-}
-
-
-// Create grid graphics
-function createGridGraphics(settings, gridData) {
-  const graphics = new PIXI.Graphics();
-  
-  // Pre-calculate colors once
-  const color = parseInt(settings.color.replace('#', '0x'));
-  const fillColor = parseInt(settings.fillColor.replace('#', '0x'));
-  
-  // Set line style once if needed
-  if (settings.enableContour) {
-    graphics.lineStyle(settings.thickness, color, settings.alpha);
-  }
-  
-  // Batch all drawing operations
-  const selectedCells = Object.values(gridData).filter(h => h.selected);
-  
-  if (settings.enableFill) {
-    graphics.beginFill(fillColor, settings.alpha);
-  }
-  
-  // Draw all shapes in one batch
-  selectedCells.forEach(cell => {
-    drawCell(graphics, cell, settings);
-  });
-  
-  if (settings.enableFill) {
-    graphics.endFill();
-  }
-  
-  return graphics;
-}
-
-function drawCell(graphics, cell, settings) {
-  const gridType = canvas.grid.type;
-  const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
-                     CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-  const size = canvas.grid.size;
-  
-  if (isHexGrid) {
-    const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
-    const hexRadius = size / Math.sqrt(3);
-    const offset = axialToPixel(cell.q, cell.r, hexRadius, isPointyTop);
-    drawHexOptimized(graphics, offset.x, offset.y, hexRadius, isPointyTop);
-  } else {
-    const offset = squareToPixel(cell.q, cell.r, size);
-    graphics.drawRect(offset.x - size / 2, offset.y - size / 2, size, size);
-  }
-}
-
-function drawHexOptimized(graphics, cx, cy, r, pointy) {
-  const startAngle = pointy ? -Math.PI / 2 : 0;
-  const points = [];
-  
-  for (let i = 0; i <= 6; i++) {
-    const angle = startAngle + i * Math.PI / 3;
-    points.push(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-  }
-  
-  graphics.drawPolygon(points);
-}
-
-// function setupImageTicker(token, settings) {
-//   if (token.sizeMattersGridTicker) {
-//     try {
-//       canvas.app.ticker.remove(token.sizeMattersGridTicker);
-//     } catch (error) {
-//       console.warn("Size Matters: Error removing ticker", error);
-//     }
-//   }
-
-//   token.sizeMattersGridTicker = () => {
-//     if (!token || !token.document || !token.center || !canvas || !canvas.tokens) {
-//       if (token && token.sizeMattersGridTicker) {
-//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-//         token.sizeMattersGridTicker = null;
-//       }
-//       return;
-//     }
-
-//     if (!canvas.tokens.placeables.includes(token)) {
-//       if (token.sizeMattersGridTicker) {
-//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-//         token.sizeMattersGridTicker = null;
-//       }
-//       return;
-//     }
-
-//     try {
-//       const centerX = token.center.x;
-//       const centerY = token.center.y;
-//       const tokenRotation = Math.toRadians(token.document.rotation || 0);
-
-//       if (token.sizeMattersImage && token.sizeMattersImage.parent) {
-//         let offsetX = settings.imageOffsetX || 0;
-//         let offsetY = settings.imageOffsetY || 0;
-
-//         if (tokenRotation !== 0) {
-//           const cos = Math.cos(tokenRotation);
-//           const sin = Math.sin(tokenRotation);
-//           const rotatedX = offsetX * cos - offsetY * sin;
-//           const rotatedY = offsetX * sin + offsetY * cos;
-//           offsetX = rotatedX;
-//           offsetY = rotatedY;
-//         }
-
-//         token.sizeMattersImage.position.set(centerX + offsetX, centerY + offsetY);
-
-//         const imageRotation = Math.toRadians(settings.imageRotation || 0);
-//         token.sizeMattersImage.rotation = tokenRotation + imageRotation;
-
-//         token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
-//       }
-//     } catch (error) {
-//       console.warn("Size Matters: Error in ticker, removing ticker", error);
-//       if (token.sizeMattersGridTicker) {
-//         canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-//         token.sizeMattersGridTicker = null;
-//       }
-//     }
-//   };
-
-//   canvas.app.ticker.add(token.sizeMattersGridTicker);
-// }
-
-function setupTicker(token, settings) {
-  if (token.sizeMattersGridTicker) {
-    canvas.app.ticker.remove(token.sizeMattersGridTicker);
-  }
-
-  token.sizeMattersGridTicker = () => {
-    // Verifica se o token e nosso contêiner ainda existem.
-    if (!token || !token.document || !token.center || !token.sizeMattersContainer || !token.sizeMattersContainer.parent) {
-      if (token && token.sizeMattersGridTicker) {
-        canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-        token.sizeMattersGridTicker = null;
-      }
-      return;
-    }
-
-    const container = token.sizeMattersContainer;
-    const tokenRotation = Math.toRadians(token.document.rotation || 0);
-
-    // 1. POSICIONA O CONTÊINER INTEIRO
-    // O contêiner é movido para o centro exato do token.
-    container.position.set(token.center.x, token.center.y);
-    container.rotation = tokenRotation;
-    container.visible = token.visible;
-
-    // 2. POSICIONA OS GRÁFICOS DENTRO DO CONTÊINER
-    // A posição deles agora é relativa ao centro do contêiner (que é o centro do token).
-    
-    if (token.sizeMattersGrid) {
-      token.sizeMattersGrid.visible = (settings.gridVisible !== false);
-      // O grid fica em (0,0) dentro do contêiner, pois já é desenhado em volta do centro.
-      token.sizeMattersGrid.position.set(0, 0);
-    }
-
-    if (token.sizeMattersImage) {
-      token.sizeMattersImage.visible = (settings.imageVisible !== false);
-      token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
-      
-      // O offset da imagem é aplicado a partir do centro (0,0) do contêiner.
-      const offsetX = settings.imageOffsetX || 0;
-      const offsetY = settings.imageOffsetY || 0;
-      token.sizeMattersImage.position.set(offsetX, offsetY);
-      
-      // A rotação da imagem é relativa à rotação do contêiner.
-      token.sizeMattersImage.rotation = Math.toRadians(settings.imageRotation || 0);
-    }
-  };
-
-  // Executa uma vez para posicionar imediatamente.
-  token.sizeMattersGridTicker();
-  canvas.app.ticker.add(token.sizeMattersGridTicker);
-}
-
-function clearTokenSizeMattersGraphics(token) {
-  if (!token) return;
-
-  // Safe graphics cleanup
-  if (token.sizeMattersGrid) {
-    try {
-      if (token.sizeMattersGrid.parent) {
-        token.sizeMattersGrid.parent.removeChild(token.sizeMattersGrid);
-      }
-      token.sizeMattersGrid.clear();
-      token.sizeMattersGrid.destroy(true); // Destroy with textures
-    } catch (error) {
-      console.warn("Size Matters: Error destroying grid graphics", error);
-    }
-  }
-  token.sizeMattersGrid = null;
-
-  if (token.sizeMattersImage) {
-    try {
-      if (token.sizeMattersImage.parent) {
-        token.sizeMattersImage.parent.removeChild(token.sizeMattersImage);
-      }
-      token.sizeMattersImage.destroy(false); // Don't destroy shared textures
-    } catch (error) {
-      console.warn("Size Matters: Error destroying image sprite", error);
-    }
-  }
-  token.sizeMattersImage = null;
-
-  // Safe ticker cleanup
-  if (token.sizeMattersGridTicker) {
-    try {
-      canvas.app?.ticker?.remove(token.sizeMattersGridTicker);
-    } catch (error) {
-      console.warn("Size Matters: Error removing ticker", error);
-    }
-  }
-  token.sizeMattersGridTicker = null;
-}
-
-function clearAllSizeMattersGraphics() {
-  if (!canvas || !canvas.tokens) return;
-
-  for (const token of canvas.tokens.placeables) {
-    clearTokenSizeMattersGraphics(token);
-  }
-
-  if (canvas.app?.ticker) {
-    const tickerFunctions = canvas.app.ticker._head;
-    let current = tickerFunctions;
-    const toRemove = [];
-
-    while (current) {
-      if (current.fn && current.fn.name === 'sizeMattersGridTicker') {
-        toRemove.push(current.fn);
-      }
-      current = current.next;
-    }
-
-    toRemove.forEach(fn => canvas.app.ticker.remove(fn));
-  }
-}
+import { axialToPixel, squareToPixel } from './utils/grid-utils.js';
+import { getTexture, clearTextureCache } from './utils/texture-utils.js';
+import {
+  drawSizeMattersGraphicsForToken,
+  clearTokenSizeMattersGraphics,
+  clearAllSizeMattersGraphics
+} from './utils/token-graphics.js';
 
 class RideManagerApp extends Application {
   constructor(options = {}) {
@@ -386,18 +30,11 @@ class RideManagerApp extends Application {
     const controlledTokens = canvas.tokens.controlled;
     
     if (controlledTokens.length > 0) {
-      // Set the first controlled token as leader
       this.selectedLeader = controlledTokens[0].id;
       
-      // Set remaining controlled tokens as followers
       for (let i = 1; i < controlledTokens.length; i++) {
         this.selectedFollowers.add(controlledTokens[i].id);
       }
-      
-      console.log("Size Matters: Initialized ride manager with controlled tokens", {
-        leader: this.selectedLeader,
-        followers: Array.from(this.selectedFollowers)
-      });
     }
   }
 
@@ -414,19 +51,15 @@ class RideManagerApp extends Application {
   }
 
   getData() {
-    // Get all tokens that are currently following someone (either as leader or follower)
     const tokensInActiveRides = new Set();
     
-    // Add all leaders to the set
     this.activeGroups.forEach((group, leaderId) => {
       tokensInActiveRides.add(leaderId);
-      // Add all followers to the set
       group.followers.forEach((follower, followerId) => {
         tokensInActiveRides.add(followerId);
       });
     });
 
-    // Filter out tokens that are already in active rides
     const availableTokens = canvas.tokens.placeables
       .filter(token => !tokensInActiveRides.has(token.id))
       .map(token => ({
@@ -464,33 +97,23 @@ class RideManagerApp extends Application {
       return;
     }
 
-    // Ensure leader token is selected
     const leaderToken = canvas.tokens.get(this.selectedLeader);
     if (leaderToken && !leaderToken.controlled) {
       leaderToken.control({ releaseOthers: true });
     }
     
-    // Ensure all follower tokens are selected
     for (const followerId of this.selectedFollowers) {
       const followerToken = canvas.tokens.get(followerId);
       if (followerToken && !followerToken.controlled) {
         followerToken.control({ releaseOthers: false });
       }
     }
+    
     if (!leaderToken) {
       ui.notifications.error("Leader token not found!");
       return;
     }
 
-    console.log("Size Matters DEBUG: ===== UI STARTING RIDE =====");
-    console.log("Size Matters DEBUG: RideManagerApp starting ride", {
-      selectedLeader: this.selectedLeader,
-      selectedFollowers: Array.from(this.selectedFollowers),
-      leaderToken: !!leaderToken,
-      leaderName: leaderToken.name
-    });
-
-    // Build followers map
     const followersMap = new Map();
     for (const followerId of this.selectedFollowers) {
       const followerToken = canvas.tokens.get(followerId);
@@ -499,59 +122,37 @@ class RideManagerApp extends Application {
           name: followerToken.name || "Unnamed Token",
           hookId: null
         });
-        console.log("Size Matters DEBUG: Added follower to map", {
-          followerId: followerId,
-          followerName: followerToken.name
-        });
-      } else {
-        console.warn("Size Matters DEBUG: Follower token not found", {
-          followerId: followerId
-        });
       }
     }
 
-    console.log("Size Matters DEBUG: Final followers map", {
-      followersCount: followersMap.size,
-      followers: Array.from(followersMap.entries())
-    });
-
     try {
-      // Use the ride-core function to start the ride
-      console.log("Size Matters DEBUG: About to call startTokenRide...");
       await startTokenRide(leaderToken, followersMap);
-      console.log("Size Matters DEBUG: startTokenRide completed successfully");
 
-      // Update local state
       this.activeGroups.set(this.selectedLeader, {
         leaderName: leaderToken.name || "Unnamed Token",
         followers: followersMap
       });
 
-      // Reset selection
       this.selectedLeader = null;
       this.selectedFollowers.clear();
       this.render();
-      
-      console.log("Size Matters DEBUG: Ride started successfully through UI");
     } catch (error) {
-      console.error("Size Matters DEBUG: Error starting ride:", error);
+      console.error("Size Matters: Error starting ride:", error);
       ui.notifications.error("Error starting ride!");
     }
   }
 
   async stopRideForLeader(leaderId) {
-    const leaderToken = canvas.tokens.get(leaderId);
-    if (!leaderToken) return;
+    const leaderDocument = canvas.scene.tokens.get(leaderId);
+    if (!leaderDocument) return;
 
-    await stopTokenRide(leaderToken);
+    await stopTokenRide(leaderDocument);
     this.activeGroups.delete(leaderId);
     
-    // Clear selections if this leader was selected
     if (this.selectedLeader === leaderId) {
       this.selectedLeader = null;
     }
     
-    // Clear any followers from this group that were selected
     const group = this.activeGroups.get(leaderId);
     if (group) {
       group.followers.forEach((follower, followerId) => {
@@ -561,26 +162,22 @@ class RideManagerApp extends Application {
   }
 
   async removeFollowerFromGroup(leaderId, followerId) {
-    const leaderToken = canvas.tokens.get(leaderId);
-    if (!leaderToken) return;
+    const leaderDocument = canvas.scene.tokens.get(leaderId);
+    if (!leaderDocument) return;
 
-    const rideStillActive = await removeFollowerFromTokenRide(leaderToken, followerId);
+    const rideStillActive = await removeFollowerFromTokenRide(leaderDocument, followerId);
     
     if (!rideStillActive) {
-      // Ride was stopped because no followers remain
       this.activeGroups.delete(leaderId);
     } else {
-      // Update local state
       const group = this.activeGroups.get(leaderId);
       if (group) {
         group.followers.delete(followerId);
       }
     }
 
-    // Clear selections if the removed follower was selected
     this.selectedFollowers.delete(followerId);
     
-    // If the leader was removed (ride stopped), clear leader selection too
     if (!rideStillActive && this.selectedLeader === leaderId) {
       this.selectedLeader = null;
     }
@@ -591,7 +188,6 @@ class RideManagerApp extends Application {
   async stopAllRides() {
     await stopAllTokenRides();
     
-    // Clear all selections since all rides are stopped
     this.selectedLeader = null;
     this.selectedFollowers.clear();
     
@@ -605,12 +201,10 @@ class RideManagerApp extends Application {
     html.find('#leader-select').change((event) => {
       this.selectedLeader = event.target.value || null;
       
-      // Auto-select the leader token on canvas
       if (this.selectedLeader) {
         const leaderToken = canvas.tokens.get(this.selectedLeader);
         if (leaderToken) {
           leaderToken.control({ releaseOthers: true });
-          console.log("Size Matters: Auto-selected leader token", leaderToken.name);
         }
       }
     });
@@ -622,17 +216,13 @@ class RideManagerApp extends Application {
       
       if (isChecked) {
         this.selectedFollowers.add(followerId);
-        // Auto-select follower token (add to selection, don't release others)
         if (followerToken) {
           followerToken.control({ releaseOthers: false });
-          console.log("Size Matters: Auto-selected follower token", followerToken.name);
         }
       } else {
         this.selectedFollowers.delete(followerId);
-        // Deselect follower token
         if (followerToken) {
           followerToken.release();
-          console.log("Size Matters: Deselected follower token", followerToken.name);
         }
       }
     });
@@ -680,6 +270,16 @@ class SizeMattersApp extends Application {
     });
   }
 
+  async render(force = false, options = {}) {
+    const result = await super.render(force, options);
+    
+    if (this.element && this.settings) {
+      this.updateFormFromSettings(this.element);
+    }
+    
+    return result;
+  }
+
   initializeGrid() {
     const gridType = canvas.grid.type;
     const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
@@ -692,7 +292,7 @@ class SizeMattersApp extends Application {
   }
 
   initializeHexGrid() {
-    const gridSize = 7;
+    const gridSize = 10;
     const grid = {};
     for (let q = -gridSize; q <= gridSize; q++) {
       for (let r = -gridSize; r <= gridSize; r++) {
@@ -731,7 +331,11 @@ class SizeMattersApp extends Application {
   loadSettings() {
     const tokenSettings = this.token ? (this.token.document.getFlag('size-matters', 'settings') || {}) : {};
     
-    this.settings = foundry.utils.mergeObject({
+    // Load global defaults first
+    const globalDefaults = game.settings.get('size-matters', 'globalDefaults') || {};
+    
+    // Start with hardcoded defaults, then merge global defaults, then token-specific settings
+    const hardcodedDefaults = {
       color: "#ff0000",
       fillColor: "#ff0000",
       thickness: 4,
@@ -745,9 +349,12 @@ class SizeMattersApp extends Application {
       imageRotation: 0,
       imageVisible: true,
       gridVisible: true
-    }, tokenSettings);
+    };
     
-    // Reference grid directly instead of duplicating
+    // Merge in order: hardcoded -> global -> token-specific
+    this.settings = foundry.utils.mergeObject(hardcodedDefaults, globalDefaults);
+    this.settings = foundry.utils.mergeObject(this.settings, tokenSettings);
+    
     if (tokenSettings.grid) {
       this.grid = tokenSettings.grid;
     } else {
@@ -759,6 +366,25 @@ class SizeMattersApp extends Application {
     if (this.token) {
       await this.token.document.setFlag('size-matters', 'settings', foundry.utils.duplicate(this.settings));
     }
+    
+    // Also save general settings (excluding grid) as global defaults
+    const globalSettings = {
+      color: this.settings.color,
+      fillColor: this.settings.fillColor,
+      thickness: this.settings.thickness,
+      alpha: this.settings.alpha,
+      enableFill: this.settings.enableFill,
+      enableContour: this.settings.enableContour,
+      imageUrl: this.settings.imageUrl,
+      imageScale: this.settings.imageScale,
+      imageOffsetX: this.settings.imageOffsetX,
+      imageOffsetY: this.settings.imageOffsetY,
+      imageRotation: this.settings.imageRotation,
+      imageVisible: this.settings.imageVisible,
+      gridVisible: this.settings.gridVisible
+    };
+    
+    await game.settings.set('size-matters', 'globalDefaults', globalSettings);
   }
 
   async setControlledToken(token) {
@@ -810,6 +436,10 @@ class SizeMattersApp extends Application {
         this.settings.grid = this.grid;
       }
       await this.saveSettings();
+      
+      this.render(true);
+      await this.drawGrid();
+      
       return true;
     }
     return false;
@@ -878,6 +508,7 @@ class SizeMattersApp extends Application {
       const pos = squareToPixel(square.q, square.r, squareSize);
       const cx = svgSize / 2 + pos.x - squareSize / 2;
       const cy = svgSize / 2 + pos.y - squareSize / 2;
+
       const fill = square.isCenter ? '#4CAF50' : square.selected ? '#2196F3' : '#fff';
       const stroke = square.isCenter ? '#2E7D32' : '#666';
       const cssClass = 'grid-selectable';
@@ -907,62 +538,81 @@ class SizeMattersApp extends Application {
   activateListeners(html) {
     super.activateListeners(html);
     this.drawGrid(html);
-    this.populatePresetsDropdown(html);
     this.setupGridInteraction(html);
+    
     html.find('input[name="thickness"]').on('input', (event) => {
       html.find('#tval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="alpha"]').on('input', (event) => {
       html.find('#aval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="imageScale"]').on('input', (event) => {
       html.find('#sval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="imageOffsetX"]').on('input', (event) => {
       html.find('#xval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="imageOffsetY"]').on('input', (event) => {
       html.find('#yval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="imageRotation"]').on('input', (event) => {
       html.find('#rval').text(event.target.value);
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="color"]').on('change', (event) => {
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="fillColor"]').on('change', (event) => {
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="enableFill"]').on('change', (event) => {
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
+    
     html.find('input[name="enableContour"]').on('change', (event) => {
       this.updateSettingsFromForm(html);
       this.drawGrid(html);
     });
-    html.find('.save-preset-button').click(() => this.handleSavePreset(html));
-    html.find('.load-preset-button').click(() => this.handleLoadPreset(html));
-    html.find('.delete-preset-button').click(() => this.handleDeletePreset(html));
+    
     html.find('.file-picker-button').click(() => this.openFilePicker(html));
     html.find('.ride-button').click(() => this.handleRideButton(html));
     html.find('.clear-button').click(() => this.clearAll(html));
-    html.find('.toggle-image-button').click(() => this.toggleImageVisibility());
-    html.find('.toggle-grid-button').click(() => this.toggleGridVisibility());
+    html.find('.preset-manager-button').click(() => this.handlePresetManager(html));
+    
+    html.find('input[name="imageVisible"]').on('change', (event) => {
+      this.updateSettingsFromForm(html);
+      this.saveSettings();
+      this.drawGrid(html);
+    });
+    
+    html.find('input[name="gridVisible"]').on('change', (event) => {
+      this.updateSettingsFromForm(html);
+      this.saveSettings();
+      this.drawGrid(html);
+    });
+    
     html.find('input:not(.clear-button)').on('change', () => {
       this.updateSettingsFromForm(html);
       this.saveSettings();
@@ -974,7 +624,6 @@ class SizeMattersApp extends Application {
     let dragMode = null;
     const gridElements = html.find('polygon[data-grid], rect[data-grid]');
     
-    // Remove any existing listeners first
     $(document).off('mouseup.size-matters');
     
     gridElements.on('mousedown', (event) => {
@@ -987,6 +636,7 @@ class SizeMattersApp extends Application {
       this.toggleGridCell(key, event.currentTarget);
       this.drawGrid(html);
     });
+    
     gridElements.on('mouseenter', (event) => {
       if (!isDragging) return;
       const key = event.currentTarget.getAttribute('data-grid');
@@ -998,78 +648,22 @@ class SizeMattersApp extends Application {
         this.drawGrid(html);
       }
     });
+    
     $(document).on('mouseup.size-matters', () => {
       isDragging = false;
       dragMode = null;
     });
+    
     html.find('.grid-container').on('mouseleave', () => {
       isDragging = false;
       dragMode = null;
     });
+    
     html.find('.grid-container').on('selectstart', (event) => {
       if (isDragging) {
         event.preventDefault();
       }
     });
-  }
-
-  async populatePresetsDropdown(html) {
-    const presets = await this.getPresets();
-    const select = html.find('#preset-select');
-    select.empty();
-    select.append('<option value="">Select preset...</option>');
-    Object.keys(presets).forEach(name => {
-      select.append(`<option value="${name}">${name}</option>`);
-    });
-  }
-
-  async handleSavePreset(html) {
-    const name = html.find('#preset-name').val().trim();
-    if (!name) {
-      ui.notifications.warn("Enter a preset name!");
-      return;
-    }
-    this.updateSettingsFromForm(html);
-    await this.savePreset(name, this.settings);
-    await this.populatePresetsDropdown(html);
-    html.find('#preset-name').val('');
-    ui.notifications.info(`Preset "${name}" saved!`);
-  }
-
-  async handleLoadPreset(html) {
-    const name = html.find('#preset-select').val();
-    if (!name) {
-      ui.notifications.warn("Select a preset to load!");
-      return;
-    }
-    const loaded = await this.loadPreset(name);
-    if (loaded) {
-      this.updateFormFromSettings(html);
-      this.updateGridSVG(html);
-      this.drawGrid(html);
-      ui.notifications.info(`Preset "${name}" loaded!`);
-    } else {
-      ui.notifications.error("Failed to load preset!");
-    }
-  }
-
-  async handleDeletePreset(html) {
-    const name = html.find('#preset-select').val();
-    if (!name) {
-      ui.notifications.warn("Select a preset to delete!");
-      return;
-    }
-    const confirmed = await Dialog.confirm({
-      title: "Delete Preset",
-      content: `<p>Are you sure you want to delete the preset "<strong>${name}</strong>"?</p>`,
-      yes: () => true,
-      no: () => false
-    });
-    if (confirmed) {
-      await this.deletePreset(name);
-      await this.populatePresetsDropdown(html);
-      ui.notifications.info(`Preset "${name}" deleted!`);
-    }
   }
 
   updateFormFromSettings(html) {
@@ -1099,7 +693,6 @@ class SizeMattersApp extends Application {
         this.settings.imageUrl = path;
         this.settings.imageVisible = true;
         this.saveSettings();
-        // Update the mini grid to show the new image
         this.updateGridSVG(html);
         this.drawGrid(html);
       }
@@ -1130,6 +723,8 @@ class SizeMattersApp extends Application {
     this.settings.imageOffsetX = parseInt(html.find('[name="imageOffsetX"]').val()) || 0;
     this.settings.imageOffsetY = parseInt(html.find('[name="imageOffsetY"]').val()) || 0;
     this.settings.imageRotation = parseInt(html.find('[name="imageRotation"]').val()) || 0;
+    this.settings.imageVisible = html.find('[name="imageVisible"]').is(':checked');
+    this.settings.gridVisible = html.find('[name="gridVisible"]').is(':checked');
     this.settings.grid = this.grid;
   }
 
@@ -1142,32 +737,23 @@ class SizeMattersApp extends Application {
     await this.saveSettings();
     await drawSizeMattersGraphicsForToken(this.token);
     
-    // Update the mini grid to show the image preview
     if (html) {
       this.updateGridSVG(html);
     }
-    
-    this._gridGraphics = this.token.sizeMattersGrid;
-    this._imageSprite = this.token.sizeMattersImage;
-    this._gridTicker = this.token.sizeMattersGridTicker;
   }
 
   async handleRideButton(html) {
     openRideManager();
   }
 
+  async handlePresetManager(html) {
+    const presetManager = new PresetManagerApp(this);
+    presetManager.render(true);
+  }
+
   clearTokenGraphics() {
     const currentToken = canvas.tokens.get(this.tokenId);
     clearTokenSizeMattersGraphics(currentToken);
-    this._gridGraphics = null;
-    this._imageSprite = null;
-    this._gridTicker = null;
-  }
-
-  clearGraphics() {
-    this._gridGraphics = null;
-    this._imageSprite = null;
-    this._gridTicker = null;
   }
 
   async clearAll(html) {
@@ -1177,7 +763,9 @@ class SizeMattersApp extends Application {
     }
     this.clearTokenGraphics();
     this.initializeGrid();
-    this.settings = {
+    
+    // Reset to hardcoded defaults
+    const hardcodedDefaults = {
       color: "#ff0000",
       fillColor: "#ff0000",
       thickness: 4,
@@ -1193,6 +781,12 @@ class SizeMattersApp extends Application {
       imageVisible: true,
       gridVisible: true
     };
+    
+    this.settings = { ...hardcodedDefaults, grid: this.grid };
+    
+    // Reset global defaults to hardcoded values
+    await game.settings.set('size-matters', 'globalDefaults', hardcodedDefaults);
+    
     if (this.token) {
       await this.token.document.unsetFlag('size-matters', 'settings');
     }
@@ -1204,7 +798,6 @@ class SizeMattersApp extends Application {
   }
 
   async close(options = {}) {
-    // Clean up event listeners
     $(document).off('mouseup.size-matters');
     
     if (this.token) {
@@ -1212,6 +805,283 @@ class SizeMattersApp extends Application {
     }
     window.sizeMattersApp = null;
     return super.close(options);
+  }
+}
+
+class PresetManagerApp extends Application {
+  constructor(sizeMattersApp = null, options = {}) {
+    super(options);
+    this.sizeMattersApp = sizeMattersApp;
+  }
+
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "preset-manager",
+      title: "Preset Manager",
+      template: "modules/size-matters/templates/preset-manager-dialog.html",
+      width: 600,
+      height: 500,
+      resizable: true,
+      closeOnSubmit: false
+    });
+  }
+
+  async getData() {
+    const presets = await this.getPresets();
+    const presetsArray = Object.entries(presets).map(([name, preset]) => {
+      return {
+        name: name,
+        imageUrl: preset.imageUrl || null,
+        isVideo: preset.imageUrl ? /\.(webm|mp4|ogg|mov)$/i.test(preset.imageUrl) : false,
+        ...preset
+      };
+    });
+
+    return {
+      presets: presetsArray
+    };
+  }
+
+  async getPresets() {
+    return game.settings.get('size-matters', 'presets') || {};
+  }
+
+  async savePreset(name, settings) {
+    const presets = await this.getPresets();
+    const presetData = {
+      color: settings.color,
+      fillColor: settings.fillColor,
+      thickness: settings.thickness,
+      alpha: settings.alpha,
+      enableFill: settings.enableFill,
+      enableContour: settings.enableContour,
+      imageUrl: settings.imageUrl,
+      imageScale: settings.imageScale,
+      imageOffsetX: settings.imageOffsetX,
+      imageOffsetY: settings.imageOffsetY,
+      imageRotation: settings.imageRotation,
+      imageVisible: settings.imageVisible,
+      gridVisible: settings.gridVisible,
+      grid: foundry.utils.duplicate(settings.grid)
+    };
+    presets[name] = presetData;
+    await game.settings.set('size-matters', 'presets', presets);
+  }
+
+  async deletePreset(name) {
+    const presets = await this.getPresets();
+    delete presets[name];
+    await game.settings.set('size-matters', 'presets', presets);
+  }
+
+  async handleSaveCurrentPreset() {
+    if (!this.sizeMattersApp) {
+      ui.notifications.warn("Size Matters window must be open to save current settings!");
+      return;
+    }
+
+    const name = document.getElementById('new-preset-name')?.value?.trim();
+    if (!name) {
+      ui.notifications.warn("Enter a preset name!");
+      return;
+    }
+
+    const currentSettings = {
+      ...this.sizeMattersApp.settings,
+      grid: foundry.utils.duplicate(this.sizeMattersApp.grid)
+    };
+
+    await this.savePreset(name, currentSettings);
+    document.getElementById('new-preset-name').value = '';
+    this.render(true);
+    ui.notifications.info(`Preset "${name}" saved!`);
+  }
+
+  async applyPreset(name) {
+    if (!this.sizeMattersApp) {
+      ui.notifications.warn("Size Matters window must be open to apply presets!");
+      return;
+    }
+
+    const loaded = await this.sizeMattersApp.loadPreset(name);
+    // if (loaded) {
+    //   ui.notifications.info(`Preset "${name}" applied!`);
+    // } else {
+    //   ui.notifications.error("Failed to apply preset!");
+    // }
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+
+    html.find('.save-current-btn').click(async () => {
+      await this.handleSaveCurrentPreset();
+    });
+
+    html.find('.preset-item').click(async (event) => {
+      if ($(event.target).closest('.preset-actions').length > 0) {
+        return;
+      }
+      
+      const presetName = event.currentTarget.getAttribute('data-preset-name');
+      await this.applyPreset(presetName);
+    });
+
+    // Adicionar listener para botão direito (associar preset ao ator)
+    html.find('.preset-item').on('contextmenu', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      const presetName = event.currentTarget.getAttribute('data-preset-name');
+      await this.associatePresetToActor(presetName);
+    });
+    html.find('.apply-preset-btn').click(async (event) => {
+      event.stopPropagation();
+      const presetName = event.currentTarget.getAttribute('data-preset-name');
+      await this.applyPreset(presetName);
+    });
+
+    html.find('.delete-preset-btn').click(async (event) => {
+      event.stopPropagation();
+      const presetName = event.currentTarget.getAttribute('data-preset-name');
+      
+      const confirmed = await Dialog.confirm({
+        title: "Delete Preset",
+        content: `<p>Are you sure you want to delete the preset "<strong>${presetName}</strong>"?</p>`,
+        yes: () => true,
+        no: () => false
+      });
+      
+      if (confirmed) {
+        await this.deletePreset(presetName);
+        this.render(true);
+        ui.notifications.info(`Preset "${presetName}" deleted!`);
+      }
+    });
+  
+    html.find('.export-presets-btn').click(async (event) => {
+      event.stopPropagation();
+      
+      try {
+        const presets = await this.getPresets();
+        
+        if (Object.keys(presets).length === 0) {
+          ui.notifications.warn("No presets to export!");
+          return;
+        }
+        
+        function downloadJSON(data, filename = 'export.json') {
+          const jsonString = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          URL.revokeObjectURL(url);
+        }
+        
+        downloadJSON(presets, 'size-matters-presets.json');
+        
+        ui.notifications.info(`Exported ${Object.keys(presets).length} preset(s) successfully!`);
+        
+      } catch (error) {
+        console.error("Size Matters: Error exporting presets:", error);
+        ui.notifications.error("Failed to export presets!");
+      }
+    });
+
+    html.find('.import-presets-btn').click(async (event) => {
+      event.stopPropagation();
+      
+      try {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json';
+        fileInput.style.display = 'none';
+        
+        fileInput.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          try {
+            const text = await file.text();
+            const importedPresets = JSON.parse(text);
+            
+            if (typeof importedPresets !== 'object' || importedPresets === null) {
+              throw new Error("Invalid preset file format");
+            }
+            
+            const currentPresets = await this.getPresets();
+            
+            const conflicts = Object.keys(importedPresets).filter(name => 
+              currentPresets.hasOwnProperty(name)
+            );
+            
+            let shouldProceed = true;
+            if (conflicts.length > 0) {
+              shouldProceed = await Dialog.confirm({
+                title: "Import Conflicts",
+                content: `<p>The following presets already exist and will be overwritten:</p>
+                         <ul>${conflicts.map(name => `<li><strong>${name}</strong></li>`).join('')}</ul>
+                         <p>Do you want to continue?</p>`,
+                yes: () => true,
+                no: () => false
+              });
+            }
+            
+            if (shouldProceed) {
+              const mergedPresets = { ...currentPresets, ...importedPresets };
+              await game.settings.set('size-matters', 'presets', mergedPresets);
+              
+              this.render(true);
+              ui.notifications.info(`Imported ${Object.keys(importedPresets).length} preset(s) successfully!`);
+            }
+            
+          } catch (error) {
+            console.error("Size Matters: Error importing presets:", error);
+            ui.notifications.error("Failed to import presets! Please check the file format.");
+          }
+          
+          document.body.removeChild(fileInput);
+        });
+        
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        
+      } catch (error) {
+        console.error("Size Matters: Error setting up import:", error);
+        ui.notifications.error("Failed to set up import!");
+      }
+    });
+  }
+
+  async associatePresetToActor(presetName) {
+    const selectedTokens = canvas.tokens.controlled;
+    if (selectedTokens.length === 0) {
+      ui.notifications.warn("Selecione um token primeiro para associar o preset ao ator!");
+      return;
+    }
+
+    const token = selectedTokens[0];
+    if (!token.actor) {
+      ui.notifications.warn("O token selecionado não possui um ator associado!");
+      return;
+    }
+
+    try {
+      await token.actor.setFlag('size-matters', 'associatedPreset', presetName);
+      ui.notifications.info(`Preset "${presetName}" associado ao ator "${token.actor.name}"!`);
+    } catch (error) {
+      console.error("Size Matters: Erro ao associar preset ao ator:", error);
+      ui.notifications.error("Erro ao associar preset ao ator!");
+    }
   }
 }
 
@@ -1236,7 +1106,6 @@ window.openSizeMatters = function() {
   window.sizeMattersApp.render(true);
 };
 
-// Export function to open ride manager dialog
 window.openRideManager = function() {
   if (!canvas || !canvas.tokens || !ui || !ui.notifications) {
     console.warn("Size Matters: Foundry VTT not ready yet. Please try again in a moment.");
@@ -1247,7 +1116,102 @@ window.openRideManager = function() {
   rideManager.render(true);
 };
 
-//HOOK DE INICIALIZAÇÃO: O lugar correto para registrar configurações.
+window.openPresetManager = function() {
+  if (!canvas || !canvas.tokens || !ui || !ui.notifications) {
+    console.warn("Size Matters: Foundry VTT not ready yet. Please try again in a moment.");
+    return;
+  }
+  
+  const presetManager = new PresetManagerApp(window.sizeMattersApp);
+  presetManager.render(true);
+};
+
+window.togglePresetOnToken = async function(presetName) {
+  if (!canvas || !canvas.tokens || !ui || !ui.notifications) {
+    console.warn("Size Matters: Foundry VTT not ready yet. Please try again in a moment.");
+    return;
+  }
+
+  const selectedTokens = canvas.tokens.controlled;
+  if (selectedTokens.length === 0) {
+    ui.notifications.warn("Select a token first!");
+    return;
+  }
+
+  const token = selectedTokens[0];
+  if (!token || !token.document) {
+    ui.notifications.error("Invalid token selected!");
+    return;
+  }
+
+  try {
+    const presets = game.settings.get('size-matters', 'presets') || {};
+    if (!presets[presetName]) {
+      ui.notifications.error(`Preset "${presetName}" not found!`);
+      return;
+    }
+
+    const currentActivePreset = token.document.getFlag('size-matters', 'activePreset');
+    
+    if (currentActivePreset === presetName) {
+      await token.document.unsetFlag('size-matters', 'settings');
+      await token.document.unsetFlag('size-matters', 'activePreset');
+      
+      clearTokenSizeMattersGraphics(token);
+      
+      ui.notifications.info(`Preset "${presetName}" deactivated from ${token.name}!`);
+    } else {
+      const preset = presets[presetName];
+      
+      clearTokenSizeMattersGraphics(token);
+      
+      const presetSettings = {
+        color: preset.color,
+        fillColor: preset.fillColor,
+        thickness: preset.thickness,
+        alpha: preset.alpha,
+        enableFill: preset.enableFill,
+        enableContour: preset.enableContour,
+        imageUrl: preset.imageUrl,
+        imageScale: preset.imageScale,
+        imageOffsetX: preset.imageOffsetX,
+        imageOffsetY: preset.imageOffsetY,
+        imageRotation: preset.imageRotation,
+        imageVisible: preset.imageVisible,
+        gridVisible: preset.gridVisible,
+        grid: foundry.utils.duplicate(preset.grid)
+      };
+      
+      await token.document.setFlag('size-matters', 'settings', presetSettings);
+      await token.document.setFlag('size-matters', 'activePreset', presetName);
+      
+      await drawSizeMattersGraphicsForToken(token);
+      
+      // ui.notifications.info(`Preset "${presetName}" applied to ${token.name}!`);
+    }
+    
+    if (window.sizeMattersApp && window.sizeMattersApp.rendered && window.sizeMattersApp.tokenId === token.id) {
+      window.sizeMattersApp.loadSettings();
+      window.sizeMattersApp.render(true);
+    }
+    
+  } catch (error) {
+    console.error("Size Matters: Error toggling preset on token:", error);
+    ui.notifications.error("Error applying preset to token!");
+  }
+};
+
+window.sizeMatters = {
+  startTokenRide,
+  stopTokenRide,
+  removeFollowerFromTokenRide,
+  getActiveRideGroups,
+  stopAllTokenRides,
+  restoreRidesFromFlags,
+  createRideFromSelection,
+  showRideManagementDialog
+};
+
 Hooks.once('init', () => {
   game.settings.register('size-matters', 'presets', {
     name: 'Size Matters Presets',
@@ -1257,14 +1221,39 @@ Hooks.once('init', () => {
     type: Object,
     default: {}
   });
+
+  game.settings.register('size-matters', 'globalDefaults', {
+    name: 'Size Matters Global Defaults',
+    hint: 'Global default settings for Size Matters module',
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {
+      color: "#ff0000",
+      fillColor: "#ff0000",
+      thickness: 4,
+      alpha: 0.7,
+      enableFill: true,
+      enableContour: true,
+      imageUrl: "",
+      imageScale: 1.0,
+      imageOffsetX: 0,
+      imageOffsetY: 0,
+      imageRotation: 0,
+      imageVisible: true,
+      gridVisible: true
+    }
+  });
 });
 
-// HOOK DE PRONTO: O lugar correto para adicionar elementos de UI como botões.
 Hooks.once('ready', () => {
-  window.sizeMattersApp = null; // Inicializa a variável global
+  window.sizeMattersApp = null;
 });
+// Adicione este bloco de código em scripts/main.js,
+// preferencialmente junto aos outros Hooks.on('ready', ...) ou Hooks.on('getSceneControlButtons', ...)
 
-// Adiciona o botão de controle de cena.
+
+
 Hooks.on("getSceneControlButtons", (controls) => {
   const tokenControls = controls.tokens;
 
@@ -1275,7 +1264,6 @@ Hooks.on("getSceneControlButtons", (controls) => {
       icon: "fas fa-hexagon",
       button: true,
       onClick: () => {
-        // A função openSizeMatters já está no escopo global.
         openSizeMatters();
       },
       visible: true
@@ -1283,9 +1271,8 @@ Hooks.on("getSceneControlButtons", (controls) => {
   }
 });
 
-
 Hooks.on('chatMessage', (chatLog, message, chatData) => {
-  if (message.trim() === '/size') {
+  if (message.trim() === '/size-matters') {
     openSizeMatters();
     return false;
   }
@@ -1312,22 +1299,23 @@ Hooks.on('releaseToken', (token, controlled) => {
 Hooks.on('canvasInit', () => {
   clearAllSizeMattersGraphics();
   
-  // Clear texture cache when canvas changes
-  textureCache.forEach((texture, url) => {
-    texture.destroy(true);
-  });
-  textureCache.clear();
+  clearTextureCache();
 });
 
 Hooks.on('canvasReady', async () => {
   setTimeout(async () => {
-    // Restore rides from flags first
     await restoreRidesFromFlags();
     
     for (const token of canvas.tokens.placeables) {
       const settings = token.document.getFlag('size-matters', 'settings');
-      if (settings && settings.grid) {
+      const activePreset = token.document.getFlag('size-matters', 'activePreset');
+      
+      if (settings && settings.grid && activePreset) {
+        // Only draw graphics if there's an active preset
         await drawSizeMattersGraphicsForToken(token);
+      } else {
+        // Clear graphics if no active preset
+        clearTokenSizeMattersGraphics(token);
       }
     }
   }, 500);
@@ -1336,20 +1324,29 @@ Hooks.on('canvasReady', async () => {
 Hooks.on('renderToken', async (token) => {
   setTimeout(async () => {
     const settings = token.document.getFlag('size-matters', 'settings');
-    if (settings && settings.grid && !token.sizeMattersGrid) {
+    const activePreset = token.document.getFlag('size-matters', 'activePreset');
+    
+    if (settings && settings.grid && activePreset && !token.sizeMattersGrid) {
+      // Only draw graphics if there's an active preset
       await drawSizeMattersGraphicsForToken(token);
+    } else if (!activePreset && token.sizeMattersGrid) {
+      // Clear graphics if no active preset
+      clearTokenSizeMattersGraphics(token);
     }
   }, 100);
 });
 
-Hooks.on('deleteToken', (token) => {
-  clearTokenSizeMattersGraphics(token);
-  
-  // Clean up ride functionality when token is deleted
-  const leaderToken = canvas.tokens.get(token.id);
-  if (leaderToken) {
-    stopTokenRide(leaderToken, true);
+Hooks.on('preDeleteToken', (tokenDocument, options, userId) => {
+  // Get the Token object before it's removed from canvas
+  const token = canvas.tokens.get(tokenDocument.id);
+  if (token) {
+    clearTokenSizeMattersGraphics(token);
   }
+});
+
+Hooks.on('deleteToken', (tokenDocument, options, userId) => {
+  // Handle ride cleanup using tokenDocument (which contains flags)
+  stopTokenRide(tokenDocument, true);
 });
 
 Hooks.on('updateScene', (scene, changes) => {
@@ -1374,5 +1371,53 @@ Hooks.on('updateToken', async (tokenDocument, changes, options, userId) => {
     // Silent error handling
   }
 });
+
+//isso aqui funciona, cuidado
+Hooks.on("renderTokenHUD", (app, html, data) => {
+  const $html = $(html);
+
+  // Verifica se o botão de montaria já foi adicionado para evitar duplicatas
+  // O 'data-action' foi alterado para 'toggle-montaria-preset' para ser mais específico
+  if ($html.find("button[data-action='toggle-montaria-preset']").length) return;
+
+  const token = canvas.tokens.get(data._id);
+  if (!token) return; // Garante que o token existe
+
+  // Obtém o preset associado ao ator do token
+  const actorAssociatedPreset = token.actor ? token.actor.getFlag('size-matters', 'associatedPreset') : null;
+  
+  // Se não há preset associado ao ator, não exibe o botão
+  if (!actorAssociatedPreset) return;
+
+  // Verifica se o preset de montaria está ativo no token
+  const currentActivePreset = token.document.getFlag('size-matters', 'activePreset');
+  const isMontariaActive = (currentActivePreset === actorAssociatedPreset);
+
+  // Cria o botão com base no estado da montaria
+  const button = $(`
+    <button type="button" class="control-icon ${isMontariaActive ? 'active' : ''}"
+            data-action="toggle-montaria-preset"
+            title="${isMontariaActive ? `Remover ${actorAssociatedPreset}` : `Adicionar ${actorAssociatedPreset}`}">
+      <i class="${isMontariaActive ? 'fa-solid fa-person-walking' : 'fa-solid fa-horse' }"></i>
+    </button>
+  `);
+
+  // Adiciona o botão à div 'col left'
+  $html.find(".col.left").append(button);
+
+  // Adiciona o evento de clique ao botão
+  button.on("click", async () => {
+    // Chama a função global para alternar o preset
+    if (window.togglePresetOnToken) {
+      await window.togglePresetOnToken(actorAssociatedPreset);
+      // Re-renderiza o HUD para que o botão atualize seu estado imediatamente
+      app.render(true);
+    } else {
+      ui.notifications.error("Função togglePresetOnToken não encontrada! Verifique se o seu módulo está carregado corretamente.");
+    }
+  });
+});
+
+
 
 export { SizeMattersApp };

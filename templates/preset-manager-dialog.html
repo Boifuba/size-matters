@@ -1,0 +1,61 @@
+<form class="preset-manager-form">
+  <!-- Save Current Settings Section -->
+  <div class="save-preset-section">
+    <h3>Save Current Settings</h3>
+    <div class="save-preset-row">
+      <input type="text" id="new-preset-name" placeholder="Enter preset name..." class="preset-input">
+      <button type="button" class="save-current-btn">
+        <i class="fas fa-save"></i> Save
+      </button>
+    </div>
+  </div>
+
+  
+ 
+  <div class="preset-list">
+    {{#if presets.length}}
+      {{#each presets}}
+      <div class="preset-item" data-preset-name="{{name}}">
+        <i class="fas fa-close delete-preset-btn" data-preset-name="{{name}}"></i>
+        <div class="preset-thumbnail">
+          {{#if imageUrl}}
+            {{#if isVideo}}
+              <video src="{{imageUrl}}" class="preset-video" autoplay loop muted playsinline></video>
+            {{else}}
+              <img src="{{imageUrl}}" alt="{{name}}" class="preset-image">
+            {{/if}}
+          {{else}}
+            <div class="preset-no-image">
+              <i class="fas fa-image"></i>
+              <span>No Image</span>
+            </div>
+          {{/if}}
+        </div>
+        <div class="preset-details-container">
+          <div class="preset-info">
+            <h4 class="preset-name">{{name}}</h4>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    {{else}}
+      <div class="no-presets">
+        <i class="fas fa-folder-open"></i>
+        <p>No presets saved yet</p>
+        <p class="no-presets-hint">Create presets in the main Size Matters window</p>
+      </div>
+    {{/if}}
+  </div>
+  <!-- Import/Export Section -->
+  <div class="import-export-section">
+    <h3>Import/Export Presets</h3>
+    <div class="import-export-row">
+      <button type="button" class="import-presets-btn">
+        <i class="fas fa-upload"></i> Import
+      </button>
+      <button type="button" class="export-presets-btn">
+        <i class="fas fa-download"></i> Export
+      </button>
+    </div>
+  </div>
+</form>
