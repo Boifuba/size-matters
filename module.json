@@ -1,7 +1,7 @@
 {
   "id": "size-matters",
   "title": "Size Matters",
-  "description": "A customizable grid highlighting tool for FoundryVTT that works with hex and square grids",
+  "description": "A customizable grid highlighting tool for Foundry VTT that works with hex and square grids",
   "authors": [
     {
       "name": "Boifubá",
