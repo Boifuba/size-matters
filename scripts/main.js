@@ -13,6 +13,10 @@ import {
 const textureCache = new Map();
 const MAX_CACHE_SIZE = 50;
 
+if (!Math.toRadians) {
+  Math.toRadians = (deg) => (deg * Math.PI) / 180;
+}
+
 // Utility functions moved outside the class for global access
 function axialToPixel(q, r, radius, pointy) {
   return pointy
