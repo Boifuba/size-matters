@@ -1,7 +1,7 @@
-<form class="ride-manager-form">
-  <div class="ride-section">
+<form class="sm-ride-manager-form">
+  <div class="sm-ride-section">
     <h3>Select Leader</h3>
-    <select id="leader-select" class="ride-select">
+    <select id="leader-select" class="sm-ride-select">
       <option value="">Choose leader token...</option>
       {{#each availableTokens}}
       <option value="{{id}}" {{#if isSelectedLeader}}selected{{/if}}>{{name}} {{#if controlled}}(controlled){{/if}}</option>
@@ -9,36 +9,36 @@
     </select>
   </div>
 
-  <div class="ride-section">
+  <div class="sm-ride-section">
     <h3>Select Followers</h3>
-    <div class="followers-list">
+    <div class="sm-followers-list">
       {{#each availableTokens}}
-      <label class="follower-item">
-        <input type="checkbox" value="{{id}}" class="follower-checkbox" {{#if isSelectedFollower}}checked{{/if}}>
+      <label class="sm-follower-item">
+        <input type="checkbox" value="{{id}}" class="sm-follower-checkbox" {{#if isSelectedFollower}}checked{{/if}}>
         <span>{{name}} {{#if controlled}}(controlled){{/if}}</span>
       </label>
       {{/each}}
     </div>
   </div>
 
-  <div class="ride-section">
+  <div class="sm-ride-section">
     <h3>Active Groups</h3>
-    <div class="active-groups">
+    <div class="sm-active-groups">
       {{#if activeGroups.length}}
         {{#each activeGroups}}
-        <div class="group-item">
-          <div class="group-header">
+        <div class="sm-group-item">
+          <div class="sm-group-header">
             <strong>Leader: {{leaderName}}</strong>
-            <button type="button" class="remove-group-btn" data-leader="{{leaderId}}">
+            <button type="button" class="sm-remove-group-btn" data-leader="{{leaderId}}">
               <i class="fas fa-times"></i>
             </button>
           </div>
-          <div class="followers-info">
+          <div class="sm-followers-info">
             Followers: 
             {{#each followers}}
-              <span class="follower-tag">
+              <span class="sm-follower-tag">
                 {{name}}
-                <button type="button" class="remove-follower-btn" data-leader="{{../leaderId}}" data-follower="{{id}}">
+                <button type="button" class="sm-remove-follower-btn" data-leader="{{../leaderId}}" data-follower="{{id}}">
                   <i class="fas fa-times"></i>
                 </button>
               </span>
@@ -47,16 +47,16 @@
         </div>
         {{/each}}
       {{else}}
-        <p class="no-groups">No active groups</p>
+        <p class="sm-no-groups">No active groups</p>
       {{/if}}
     </div>
   </div>
 
-  <div class="ride-actions">
-    <button type="button" class="action-btn start-ride-btn">
+  <div class="sm-ride-actions">
+    <button type="button" class="sm-action-btn sm-start-ride-btn">
       <i class="fas fa-play"></i> Start Ride
     </button>
-    <button type="button" class="action-btn stop-all-btn">
+    <button type="button" class="sm-action-btn sm-stop-all-btn">
       <i class="fas fa-stop"></i> Stop All
     </button>
   </div>
