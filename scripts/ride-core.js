@@ -373,43 +373,11 @@ function toggleQuickFollow() {
   ui.notifications.info("Quick Follow enabled! Select followers, then leader (last).");
 }
 
-// Also expose globally for backward compatibility
-window.toggleQuickFollow = toggleQuickFollow;
-
 // ================================
-// FOUNDRY HOOKS REGISTRATION
+// FOUNDRY HOOKS REGISTRATION (moved to main.js for centralization)
 // ================================
 
-/**
- * Handles scene initialization - stops all rides and restores from flags
- */
-Hooks.on('canvasReady', () => {
-  stopAllTokenRides().then(() => restoreRidesFromFlags());
-});
-
-/**
- * Handles token deletion - cleans up rides involving deleted tokens
- */
-Hooks.on('deleteToken', (tokenDocument, options, userId) => {
-  // If a leader is deleted, stop their ride
-  const rideData = Array.from(window.sizeMattersActiveRides.values())
-    .find(ride => ride.leaderId === tokenDocument.id);
-  
-  if (rideData) {
-    stopTokenRide(tokenDocument, true);
-  }
-  
-  // If a follower is deleted, remove them from any ride
-  for (const [rideId, rideData] of window.sizeMattersActiveRides.entries()) {
-    if (rideData.followers.has(tokenDocument.id)) {
-      // Get the leader document from the scene
-      const leaderDocument = canvas.scene.tokens.get(rideData.leaderId);
-      if (leaderDocument) {
-        removeFollowerFromTokenRide(leaderDocument, tokenDocument.id);
-      }
-    }
-  }
-});
+// Note: Hooks are now registered in main.js to avoid duplication
 
 // ================================
 // EXPORTS

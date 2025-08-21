@@ -1,0 +1,96 @@
+<form class="sm-grid-size-config-form">
+  <div class="sm-config-section">
+    <h3>Small Zoom Level</h3>
+    <div class="sm-config-row">
+      <div class="sm-config-group">
+        <h4>Hexagonal Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="small.hex.gridSize" value="{{config.small.hex.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Hex Radius (pixels):</label>
+          <input type="number" name="small.hex.svgRadius" value="{{config.small.hex.svgRadius}}" min="5" max="100">
+        </div>
+      </div>
+      <div class="sm-config-group">
+        <h4>Square Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="small.square.gridSize" value="{{config.small.square.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Square Size (pixels):</label>
+          <input type="number" name="small.square.squareSize" value="{{config.small.square.squareSize}}" min="5" max="150">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sm-config-section">
+    <h3>Medium Zoom Level</h3>
+    <div class="sm-config-row">
+      <div class="sm-config-group">
+        <h4>Hexagonal Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="medium.hex.gridSize" value="{{config.medium.hex.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Hex Radius (pixels):</label>
+          <input type="number" name="medium.hex.svgRadius" value="{{config.medium.hex.svgRadius}}" min="5" max="100">
+        </div>
+      </div>
+      <div class="sm-config-group">
+        <h4>Square Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="medium.square.gridSize" value="{{config.medium.square.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Square Size (pixels):</label>
+          <input type="number" name="medium.square.squareSize" value="{{config.medium.square.squareSize}}" min="5" max="150">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sm-config-section">
+    <h3>Large Zoom Level</h3>
+    <div class="sm-config-row">
+      <div class="sm-config-group">
+        <h4>Hexagonal Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="large.hex.gridSize" value="{{config.large.hex.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Hex Radius (pixels):</label>
+          <input type="number" name="large.hex.svgRadius" value="{{config.large.hex.svgRadius}}" min="5" max="100">
+        </div>
+      </div>
+      <div class="sm-config-group">
+        <h4>Square Grid</h4>
+        <div class="sm-input-group">
+          <label>Grid Size (cells):</label>
+          <input type="number" name="large.square.gridSize" value="{{config.large.square.gridSize}}" min="1" max="10">
+        </div>
+        <div class="sm-input-group">
+          <label>Square Size (pixels):</label>
+          <input type="number" name="large.square.squareSize" value="{{config.large.square.squareSize}}" min="5" max="150">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sm-form-notes">
+    <p><strong>Grid Size:</strong> Number of cells extending from center in each direction</p>
+    <p><strong>Hex Radius:</strong> Visual size of hexagon cells in the interface</p>
+    <p><strong>Square Size:</strong> Visual size of square cells in the interface</p>
+  </div>
+
+  <div class="sm-form-footer">
+    <button type="submit" class="sm-save-config-btn">
+      <i class="fas fa-save"></i> Save Configuration
+    </button>
+  </div>

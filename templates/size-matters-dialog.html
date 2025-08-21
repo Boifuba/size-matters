@@ -1,72 +1,137 @@
-<form class="size-matters-form">
-  <!-- Grid Selection -->
-  <div class="grid-container">
-    {{{gridSVG}}}
+<form class="sm-size-matters-form">
+  <!-- Grid Selection with Zoom Controls -->
+  <div class="sm-grid-wrapper">
+    <div class="sm-grid-container">
+      {{{gridSVG}}}
+    </div>
+    {{#unless noToken}}
+    <div class="sm-zoom-btn">
+      <button type="button" class="sm-zoom-out-btn" title="Zoom Out">
+        <i class="fa-solid fa-magnifying-glass-minus"></i>
+      </button>
+      <button type="button" class="sm-zoom-in-btn" title="Zoom In">
+        <i class="fa-solid fa-magnifying-glass-plus"></i>
+      </button>
+    </div>
+    {{/unless}}
+  </div>
+  <!-- Scale, Position & Appearance Controls -->
+  <div class="sm-section">
+    <div class="sm-accordion">
+      <div class="sm-accordion-header" data-target="scale-controls">
+        <i class="fas fa-chevron-right sm-accordion-icon"></i>
+        <span>Scale & Position</span>
+      </div>
+      <div class="sm-accordion-content" id="scale-controls">
+        <div class="sm-control-row">
+          <label>Scale:</label>
+          <input type="range" class="sm-slider" name="imageScale" min="0.1" max="3.0" step="0.1" value="{{imageScale}}">
+          <span class="sm-value" id="sval">{{imageScale}}</span>
+        </div>
+        <div class="sm-control-row">
+          <label>X:</label>
+          <input type="range" class="sm-slider" name="imageOffsetX" min="-200" max="200" value="{{imageOffsetX}}">
+          <span class="sm-value" id="xval">{{imageOffsetX}}</span>
+        </div>
+        <div class="sm-control-row">
+          <label>Y:</label>
+          <input type="range" class="sm-slider" name="imageOffsetY" min="-200" max="200" value="{{imageOffsetY}}">
+          <span class="sm-value" id="yval">{{imageOffsetY}}</span>
+        </div>
+        <div class="sm-control-row">
+          <label>Rotation:</label>
+          <input type="range" class="sm-slider" name="imageRotation" min="-180" max="180" value="{{imageRotation}}">
+          <span class="sm-value" id="rval">{{imageRotation}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acordeão para controles de aparência -->
+    <div class="sm-accordion">
+      <div class="sm-accordion-header" data-target="appearance-controls">
+        <i class="fas fa-chevron-right sm-accordion-icon"></i>
+        <span>Appearance</span>
+      </div>
+      <div class="sm-accordion-content" id="appearance-controls">
+        <div class="sm-color-row">
+          <div class="sm-color-control">
+            <label>Outline:</label>
+            <input type="color" class="sm-color-input" name="color" value="{{color}}">
+          </div>
+          <div class="sm-color-control">
+            <label>Fill:</label>
+            <input type="color" class="sm-color-input" name="fillColor" value="{{fillColor}}">
+          </div>
+          <div class="sm-color-control">
+            <label>Opacity:</label>
+            <input type="text" class="sm-opacity-input" name="alpha" value="{{alpha}}" placeholder="0.0 - 1.0">
+          </div>
+        </div>
+        <div class="sm-checkbox-row">
+          <label><input type="checkbox" name="enableContour" {{#if enableContour}}checked{{/if}}> Outline</label>
+          <label><input type="checkbox" name="enableFill" {{#if enableFill}}checked{{/if}}> Fill</label>
+          <label><input type="checkbox" name="imageVisible" {{#if imageVisible}}checked{{/if}}> Image</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accordion para Directional Colors -->
+    <div class="sm-accordion">
+      <div class="sm-accordion-header" data-target="directional-controls">
+        <i class="fas fa-chevron-right sm-accordion-icon"></i>
+        <span>Directional Colors</span>
+      </div>
+      <div class="sm-accordion-content" id="directional-controls">
+        <div class="sm-checkbox-row">
+          <label><input type="checkbox" name="enableDirectionalHighlight" {{#if enableDirectionalHighlight}}checked{{/if}}> Enable Directional Colors</label>
+        </div>
+        <div class="sm-directional-buttons">
+          <div class="sm-red-directional-group">
+            <div class="sm-directional-label">Back</div>
+            <div class="sm-directional-group-buttons">
+              <button type="button" class="sm-directional-btn sm-add-red-btn" title="Add Red Line">
+                <i class="fas fa-plus"></i>
+              </button>
+              <button type="button" class="sm-directional-btn sm-remove-red-btn" title="Remove Red Line">
+                <i class="fas fa-minus"></i>
+              </button>
+            </div>
+          </div>
+          <div class="sm-green-directional-group">
+            <div class="sm-directional-label">Front</div>
+            <div class="sm-directional-group-buttons">
+              <button type="button" class="sm-directional-btn sm-add-green-btn" title="Add Green Line">
+                <i class="fas fa-plus"></i>
+              </button>
+              <button type="button" class="sm-directional-btn sm-remove-green-btn" title="Remove Green Line">
+                <i class="fas fa-minus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Image Controls -->
-  <div class="section">
+  <div class="sm-section">
     <!-- Browse e Presets lado a lado -->
-    <div class="button-row">
-      <button type="button" class="file-picker-button">
+    <div class="sm-button-row">
+      <button type="button" class="sm-file-picker-button">
         <i class="fas fa-folder-open"></i> Browse Image
       </button>
-      <button type="button" class="preset-manager-button">
+      <button type="button" class="sm-preset-manager-button">
         <i class="fas fa-th-large"></i> Presets
       </button>
-    </div>
-    
-    <div class="control-row">
-      <label>Scale:</label>
-      <input type="range" class="slider" name="imageScale" min="0.1" max="3.0" step="0.1" value="{{imageScale}}">
-      <span class="value" id="sval">{{imageScale}}</span>
-    </div>
-    <div class="control-row">
-      <label>X:</label>
-      <input type="range" class="slider" name="imageOffsetX" min="-200" max="200" value="{{imageOffsetX}}">
-      <span class="value" id="xval">{{imageOffsetX}}</span>
-    </div>
-    <div class="control-row">
-      <label>Y:</label>
-      <input type="range" class="slider" name="imageOffsetY" min="-200" max="200" value="{{imageOffsetY}}">
-      <span class="value" id="yval">{{imageOffsetY}}</span>
-    </div>
-    <div class="control-row">
-      <label>Rotation:</label>
-      <input type="range" class="slider" name="imageRotation" min="-180" max="180" value="{{imageRotation}}">
-      <span class="value" id="rval">{{imageRotation}}</span>
-    </div>
-  </div>
-
-  <!-- Appearance Controls -->
-  <div class="section">
-    <div class="control-row">
-      <label>Outline:</label>
-      <input type="color" class="color-input" name="color" value="{{color}}">
-      <input type="range" class="slider" name="thickness" min="1" max="10" value="{{thickness}}">
-      <span class="value" id="tval">{{thickness}}</span>
-    </div>
-    <div class="control-row">
-      <label>Fill:</label>
-      <input type="color" class="color-input" name="fillColor" value="{{fillColor}}">
-      <input type="range" class="slider" name="alpha" min="0.1" max="1" step="0.1" value="{{alpha}}">
-      <span class="value" id="aval">{{alpha}}</span>
-    </div>
-    <div class="checkbox-row">
-      <label><input type="checkbox" name="enableContour" {{#if enableContour}}checked{{/if}}> Outline</label>
-      <label><input type="checkbox" name="enableFill" {{#if enableFill}}checked{{/if}}> Fill</label>
-      <label><input type="checkbox" name="imageVisible" {{#if imageVisible}}checked{{/if}}> Image</label>
-      <label><input type="checkbox" name="gridVisible" {{#if gridVisible}}checked{{/if}}> Grid</label>
-    </div>
-  </div>
-
-  <!-- Action Buttons - Ride e Clear All lado a lado -->
-  <div class="actions">
-    <button type="button" class="action-btn ride-button">
+       <button type="button" class="sm-action-btn sm-ride-button">
       <i class="fas fa-horse"></i> Ride
     </button>
-    <button type="button" class="action-btn clear-button">
+    <button type="button" class="sm-action-btn sm-clear-button">
       <i class="fas fa-eraser"></i> Clear All
     </button>
+    </div>
   </div>
+
+
 </form>
