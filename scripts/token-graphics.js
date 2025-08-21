@@ -4,12 +4,7 @@
  */
 
 import { axialToPixel, squareToPixel, getHexVertices, getEdgeKey } from './grid-utils.js';
-import { DIRECTIONAL_COLORS, DEFAULT_SETTINGS } from './constants.js';
-import { getTexture, clearTextureCache, getCacheSize } from './texture-utils.js';
-
-// ================================
-// TOKEN GRAPHICS LOGIC
-// ================================
+import { getTexture } from './texture-utils.js';
 
 // Função auxiliar para reconstruir o caminho do contorno
 function getOutlinePath(outlineEdgeKeys, allEdges) {
@@ -65,11 +60,30 @@ export async function drawSizeMattersGraphicsForToken(token) {
 
   // Se não houver configurações específicas do token, crie um conjunto padrão.
   if (!settings) {
-    settings = { ...DEFAULT_SETTINGS, grid: {} };
+    settings = {
+      color: "#ff0000", // Cor padrão
+      fillColor: "#ff0000", // Cor de preenchimento padrão
+      thickness: 3, // Espessura padrão
+      alpha: 0.7, // Opacidade padrão
+      enableFill: true, // Preenchimento habilitado por padrão
+      enableContour: true, // Contorno habilitado por padrão
+      imageUrl: "", // Sem imagem por padrão
+      imageScale: 1.0,
+      imageOffsetX: 0,
+      imageOffsetY: 0,
+      imageRotation: 0,
+      imageVisible: true,
+      zoomLevel: "medium",
+      redLineAdjustment: 0,
+      greenLineAdjustment: 0,
+      grid: {}, // Grid vazio por padrão
+    };
   }
 
   // Sobrescreva a configuração de destaque direcional com o valor global atual
   settings.enableDirectionalHighlight = globalEnableDirectionalHighlight;
+
+  console.log(`Size Matters: Token ${token.id} - Directional Colors: ${settings.enableDirectionalHighlight ? 'ATIVO' : 'INATIVO'}`);
 
   clearTokenSizeMattersGraphics(token);
 
@@ -194,7 +208,9 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
   const size      = gridSize || canvas.grid.size;
 
   const enableDirectionalHighlight = settings.enableDirectionalHighlight;
-  const { RED, GREEN, YELLOW: YELL } = DIRECTIONAL_COLORS;
+  const RED   = 0xFF0000; // topo
+  const GREEN = 0x00FF00; // base
+  const YELL  = 0xFFFF00; // laterais
 
   if (isHexGrid) {
     const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
@@ -297,6 +313,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
         }
       }
       
+      console.log(`Found ${northEdges.length} north edges`);
       
       if (northEdges.length > 0) {
         // Expansão básica limitada do vermelho
@@ -332,6 +349,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
         }
       }
       
+      console.log(`Found ${currentGreenEdges.length} south edges`);
 
       let allGreenEdges = [...currentGreenEdges];
       
@@ -358,6 +376,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
       
       // Ajuste manual do VERMELHO (pode ser positivo ou negativo)
       const redAdjustment = settings.redLineAdjustment || 0;
+      console.log(`Applying red adjustment: ${redAdjustment}`);
       
       if (redAdjustment > 0) {
         // Adicionar mais camadas vermelhas - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
@@ -385,9 +404,11 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
           }
           
           currentRedEdges = [...nextLayerEdges];
+          console.log(`Red manual expansion layer ${layer + 1}: ${nextLayerEdges.length} edges (total red: ${col.filter(c => c === RED).length})`);
           
           // Se não conseguiu expandir nada, para
           if (nextLayerEdges.length === 0) {
+            console.log(`Red expansion stopped at layer ${layer + 1} - no more edges to convert`);
             break;
           }
         }
@@ -413,6 +434,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
             col[idx] = YELL;
           }
           
+          console.log(`Red manual reduction layer ${layer + 1}: ${edgesToRemove.length} edges removed (total red: ${col.filter(c => c === RED).length})`);
           
           if (edgesToRemove.length === 0) break; // Não há mais edges para remover
         }
@@ -420,6 +442,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
       
       // Ajuste manual do VERDE (pode ser positivo ou negativo)
       const greenAdjustment = settings.greenLineAdjustment || 0;
+      console.log(`Applying green adjustment: ${greenAdjustment}`);
       
       if (greenAdjustment > 0) {
         // Adicionar mais camadas verdes - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
@@ -447,9 +470,11 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
           }
           
           currentGreenEdges = [...nextLayerEdges];
+          console.log(`Green manual expansion layer ${layer + 1}: ${nextLayerEdges.length} edges (total green: ${col.filter(c => c === GREEN).length})`);
           
           // Se não conseguiu expandir nada, para
           if (nextLayerEdges.length === 0) {
+            console.log(`Green expansion stopped at layer ${layer + 1} - no more edges to convert`);
             break;
           }
         }
@@ -475,6 +500,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
             col[idx] = YELL;
           }
           
+          console.log(`Green manual reduction layer ${layer + 1}: ${edgesToRemove.length} edges removed (total green: ${col.filter(c => c === GREEN).length})`);
           
           if (edgesToRemove.length === 0) break; // Não há mais edges para remover
         }

@@ -4,7 +4,6 @@
  */
 
 import { axialToPixel, squareToPixel } from './grid-utils.js';
-import { DEFAULT_GRID_SIZE_CONFIG } from './constants.js';
 
 /**
  * Obtém a configuração de zoom atual das configurações do jogo
@@ -15,8 +14,21 @@ function getZoomConfig() {
     return game.settings.get('size-matters', 'gridSizeConfig');
   }
   
-  // Fallback para configuração padrão consistente
-  return DEFAULT_GRID_SIZE_CONFIG;
+  // Fallback para configuração padrão se game.settings não estiver disponível
+  return {
+    small: {
+      hex: { gridSize: 10, svgRadius: 12 },
+      square: { gridSize: 4, squareSize: 20 }
+    },
+    medium: {
+      hex: { gridSize: 10, svgRadius: 16 },
+      square: { gridSize: 4, squareSize: 40 }
+    },
+    large: {
+      hex: { gridSize: 8, svgRadius: 24 },
+      square: { gridSize: 4, squareSize: 60 }
+    }
+  };
 }
 
 export class GridManager {

@@ -44,6 +44,8 @@ export class SettingsManager {
    * @param {boolean} newValue - Novo valor da configuração
    */
   static async onDirectionalHighlightChange(newValue) {
+    console.log(`Size Matters: Directional highlight changed to ${newValue}`);
+    
     // Aguardar um tick para garantir que a configuração foi salva
     await new Promise(resolve => setTimeout(resolve, 50));
     
@@ -97,6 +99,9 @@ export class SettingsManager {
     game.socket.on("module.size-matters", async (data) => {
       switch (data.type) {
         case "directionalHighlightChanged":
+          // Console log para avisar o cliente sobre mudança no directional highlight
+          console.log(`Size Matters: Directional Colors ${data.value ? 'LIGADO' : 'DESLIGADO'} pelo GM`);
+          
           // Atualizar interface se necessário
           if (window.sizeMattersUI) {
             window.sizeMattersUI.updateDirectionalHighlightCheckbox(data.value);
