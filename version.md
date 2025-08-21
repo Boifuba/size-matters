@@ -7,3 +7,9 @@ Benefits of These Changes
     Better User Experience: More responsive UI with optimized update cycles
 
 
+    Consistency: Both the preview in SizeMattersApp and the canvas rendering now use the same data structure
+    Performance: Eliminates string manipulation and DOM parsing for SVG generation
+    Maintainability: Centralized geometry calculations in GridManager
+    Extensibility: The structured data format makes it easier to add new visual effects or rendering modes
+    PIXI.js Alignment: Better integration with Foundry VTT's rendering architecture
+
