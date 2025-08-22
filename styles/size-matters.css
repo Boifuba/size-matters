@@ -959,7 +959,7 @@
 .sm-config-section h3 {
   margin-top: 0;
   color: #333;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #333;
   padding-bottom: 5px;
 }
 
@@ -970,9 +970,6 @@
 
 .sm-config-group {
   flex: 1;
-  border: 1px solid #eee;
-  border-radius: 3px;
-  padding: 10px;
 }
 
 .sm-config-group h4 {
@@ -988,7 +985,7 @@
 .sm-input-group label {
   display: block;
   margin-bottom: 3px;
-  font-weight: bold;
+  font-weight: semibold;
   font-size: 12px;
 }
 
@@ -1000,9 +997,6 @@
 }
 
 .sm-form-notes {
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 3px;
   padding: 10px;
   margin-top: 15px;
 }
@@ -1021,7 +1015,7 @@
 }
 
 .sm-save-config-btn {
-  background-color: #4CAF50;
+  background-color: #333;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -1032,7 +1026,7 @@
 }
 
 .sm-save-config-btn:hover {
-  background-color: #45a049;
+  background-color: #222222;
 }
 
 .sm-save-config-btn i {

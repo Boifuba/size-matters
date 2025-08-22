@@ -4,7 +4,12 @@
  */
 
 import { axialToPixel, squareToPixel, getHexVertices, getEdgeKey } from './grid-utils.js';
+import { DIRECTIONAL_COLORS, DEFAULT_SETTINGS } from './constants.js';
 import { getTexture } from './texture-utils.js';
+
+// ================================
+// TOKEN GRAPHICS LOGIC
+// ================================
 
 // Função auxiliar para reconstruir o caminho do contorno
 function getOutlinePath(outlineEdgeKeys, allEdges) {
@@ -51,45 +56,28 @@ export async function drawSizeMattersGraphicsForToken(token) {
   if (!token || !token.document) return;
 
   let settings = token.document.getFlag('size-matters', 'settings');
+  
+  // If no settings exist for this token, clear any existing graphics and return
+  if (!settings) {
+    clearTokenSizeMattersGraphics(token);
+    return;
+  }
+  
   const gridType = canvas.grid.type;
   const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
                      CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
 
-  // Sempre obtenha o valor atual e global da configuração de destaque direcional
-  const globalEnableDirectionalHighlight = game.settings.get("size-matters", "enableDirectionalHighlight");
-
   // Se não houver configurações específicas do token, crie um conjunto padrão.
   if (!settings) {
-    settings = {
-      color: "#ff0000", // Cor padrão
-      fillColor: "#ff0000", // Cor de preenchimento padrão
-      thickness: 3, // Espessura padrão
-      alpha: 0.7, // Opacidade padrão
-      enableFill: true, // Preenchimento habilitado por padrão
-      enableContour: true, // Contorno habilitado por padrão
-      imageUrl: "", // Sem imagem por padrão
-      imageScale: 1.0,
-      imageOffsetX: 0,
-      imageOffsetY: 0,
-      imageRotation: 0,
-      imageVisible: true,
-      zoomLevel: "medium",
-      redLineAdjustment: 0,
-      greenLineAdjustment: 0,
-      grid: {}, // Grid vazio por padrão
-    };
+    settings = { ...DEFAULT_SETTINGS, grid: {} };
   }
-
-  // Sobrescreva a configuração de destaque direcional com o valor global atual
-  settings.enableDirectionalHighlight = globalEnableDirectionalHighlight;
-
-  console.log(`Size Matters: Token ${token.id} - Directional Colors: ${settings.enableDirectionalHighlight ? 'ATIVO' : 'INATIVO'}`);
 
   clearTokenSizeMattersGraphics(token);
 
   token.sizeMattersContainer = new PIXI.Container();
   canvas.primary.addChild(token.sizeMattersContainer);
 
+  // Load effect image if available
   if (settings.imageUrl && settings.imageUrl.trim()) {
     try {
       const texture = await getTexture(settings.imageUrl);
@@ -99,6 +87,39 @@ export async function drawSizeMattersGraphicsForToken(token) {
       }
     } catch (error) {
       console.warn("Size Matters: Falha ao carregar imagem para o token", token.id, error);
+    }
+  }
+
+  // Load token image for rendering on top
+  if (token.document && token.document.texture && token.document.texture.src) {
+    try {
+      const tokenTexture = await getTexture(token.document.texture.src);
+      if (tokenTexture) {
+        token.sizeMattersTokenImage = new PIXI.Sprite(tokenTexture);
+        token.sizeMattersTokenImage.anchor.set(0.5, 0.5);
+        
+        // Calculate token image size based on grid type and token size
+        const gridType = canvas.grid.type;
+        const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
+                           CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
+        const gridSize = canvas.grid.size;
+        
+        let tokenImageSize;
+        if (isHexGrid) {
+          const hexRadius = gridSize / Math.sqrt(3);
+          tokenImageSize = hexRadius * 1.5;
+        } else {
+          tokenImageSize = gridSize * 0.8;
+        }
+        
+        // Scale the token image to fit the grid cell
+        const scaleX = tokenImageSize / tokenTexture.width;
+        const scaleY = tokenImageSize / tokenTexture.height;
+        const scale = Math.min(scaleX, scaleY);
+        token.sizeMattersTokenImage.scale.set(scale, scale);
+      }
+    } catch (error) {
+      console.warn("Size Matters: Falha ao carregar imagem do token", token.id, error);
     }
   }
 
@@ -127,8 +148,14 @@ export async function drawSizeMattersGraphicsForToken(token) {
     token.sizeMattersContainer.addChild(token.sizeMattersGrid);
   }
 
+  // Add effect image (middle layer)
   if (token.sizeMattersImage) {
     token.sizeMattersContainer.addChild(token.sizeMattersImage);
+  }
+
+  // Add token image on top (highest layer)
+  if (token.sizeMattersTokenImage) {
+    token.sizeMattersContainer.addChild(token.sizeMattersTokenImage);
   }
 
   // Configure o ticker apenas se houver algo para exibir (grid ou imagem)
@@ -201,6 +228,9 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
   const selectedCells = Object.values(gridData).filter(h => h.selected);
   if (selectedCells.length === 0) return graphics;
 
+  // Ensure alpha is always a valid number between 0 and 1 for PIXI.js
+  const effectiveAlpha = Math.max(0, Math.min(1, parseFloat(settings.alpha) || 0.8));
+
   const color     = parseInt(settings.color.replace("#", "0x"));
   const fillColor = parseInt(settings.fillColor.replace("#", "0x"));
   const gridType  = canvas.grid.type;
@@ -208,9 +238,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
   const size      = gridSize || canvas.grid.size;
 
   const enableDirectionalHighlight = settings.enableDirectionalHighlight;
-  const RED   = 0xFF0000; // topo
-  const GREEN = 0x00FF00; // base
-  const YELL  = 0xFFFF00; // laterais
+  const { RED, GREEN, YELLOW: YELL } = DIRECTIONAL_COLORS;
 
   if (isHexGrid) {
     const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
@@ -237,7 +265,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
     if (enableDirectionalHighlight && selectedCells.length === 1 && !isPointyTop) {
         if (settings.enableFill) {
             const path = getOutlinePath(new Set(outlineEdges.map(e => e.key)), edgesRaw);
-            graphics.beginFill(fillColor, settings.alpha);
+            graphics.beginFill(fillColor, effectiveAlpha);
             graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
             graphics.endFill();
         }
@@ -250,7 +278,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
                     case 3: case 5: edgeColor = YELL; break;
                     default: edgeColor = color;
                 }
-                graphics.lineStyle(settings.thickness, edgeColor, settings.alpha);
+                graphics.lineStyle(settings.thickness, edgeColor, effectiveAlpha);
                 graphics.moveTo(edge.p1.x, edge.p1.y);
                 graphics.lineTo(edge.p2.x, edge.p2.y);
             }
@@ -262,7 +290,7 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
     if (path.length < 2) return graphics;
 
     if (settings.enableFill) {
-      graphics.beginFill(fillColor, settings.alpha);
+      graphics.beginFill(fillColor, effectiveAlpha);
       graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
       graphics.endFill();
     }
@@ -313,7 +341,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
         }
       }
       
-      console.log(`Found ${northEdges.length} north edges`);
       
       if (northEdges.length > 0) {
         // Expansão básica limitada do vermelho
@@ -349,7 +376,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
         }
       }
       
-      console.log(`Found ${currentGreenEdges.length} south edges`);
 
       let allGreenEdges = [...currentGreenEdges];
       
@@ -376,7 +402,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
       
       // Ajuste manual do VERMELHO (pode ser positivo ou negativo)
       const redAdjustment = settings.redLineAdjustment || 0;
-      console.log(`Applying red adjustment: ${redAdjustment}`);
       
       if (redAdjustment > 0) {
         // Adicionar mais camadas vermelhas - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
@@ -404,11 +429,9 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
           }
           
           currentRedEdges = [...nextLayerEdges];
-          console.log(`Red manual expansion layer ${layer + 1}: ${nextLayerEdges.length} edges (total red: ${col.filter(c => c === RED).length})`);
           
           // Se não conseguiu expandir nada, para
           if (nextLayerEdges.length === 0) {
-            console.log(`Red expansion stopped at layer ${layer + 1} - no more edges to convert`);
             break;
           }
         }
@@ -434,7 +457,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
             col[idx] = YELL;
           }
           
-          console.log(`Red manual reduction layer ${layer + 1}: ${edgesToRemove.length} edges removed (total red: ${col.filter(c => c === RED).length})`);
           
           if (edgesToRemove.length === 0) break; // Não há mais edges para remover
         }
@@ -442,7 +464,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
       
       // Ajuste manual do VERDE (pode ser positivo ou negativo)
       const greenAdjustment = settings.greenLineAdjustment || 0;
-      console.log(`Applying green adjustment: ${greenAdjustment}`);
       
       if (greenAdjustment > 0) {
         // Adicionar mais camadas verdes - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
@@ -470,11 +491,9 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
           }
           
           currentGreenEdges = [...nextLayerEdges];
-          console.log(`Green manual expansion layer ${layer + 1}: ${nextLayerEdges.length} edges (total green: ${col.filter(c => c === GREEN).length})`);
           
           // Se não conseguiu expandir nada, para
           if (nextLayerEdges.length === 0) {
-            console.log(`Green expansion stopped at layer ${layer + 1} - no more edges to convert`);
             break;
           }
         }
@@ -500,7 +519,6 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
             col[idx] = YELL;
           }
           
-          console.log(`Green manual reduction layer ${layer + 1}: ${edgesToRemove.length} edges removed (total green: ${col.filter(c => c === GREEN).length})`);
           
           if (edgesToRemove.length === 0) break; // Não há mais edges para remover
         }
@@ -508,18 +526,18 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
       
       // Desenho do contorno colorido
       for (let i = 0; i < N; i++) {
-        graphics.lineStyle(settings.thickness, col[i], settings.alpha);
+        graphics.lineStyle(settings.thickness, col[i], effectiveAlpha);
         graphics.moveTo(typed[i].p1.x, typed[i].p1.y);
         graphics.lineTo(typed[i].p2.x, typed[i].p2.y);
       }
     } else {
-      graphics.lineStyle(settings.thickness, color, settings.alpha);
+      graphics.lineStyle(settings.thickness, color, effectiveAlpha);
       graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
     }
   } else {
     // Quadrados (inalterado)
-    if (settings.enableFill) graphics.beginFill(fillColor, settings.alpha);
-    if (settings.enableContour) graphics.lineStyle(settings.thickness, color, settings.alpha);
+    if (settings.enableFill) graphics.beginFill(fillColor, effectiveAlpha);
+    if (settings.enableContour) graphics.lineStyle(settings.thickness, color, effectiveAlpha);
     selectedCells.forEach(cell => {
       const offset = squareToPixel(cell.q, cell.r, size);
       graphics.drawRect(offset.x - size / 2, offset.y - size / 2, size, size);
@@ -567,6 +585,15 @@ export function setupTicker(token, settings) {
       
       token.sizeMattersImage.rotation = Math.toRadians(settings.imageRotation || 0);
     }
+
+    if (token.sizeMattersTokenImage) {
+      // Token image is always visible when the container is visible
+      token.sizeMattersTokenImage.visible = true;
+      token.sizeMattersTokenImage.position.set(0, 0); // Centered in container
+      
+      // Token image doesn't rotate with the container - it maintains its own rotation
+      token.sizeMattersTokenImage.rotation = 0;
+    }
   };
 
   token.sizeMattersGridTicker();
@@ -612,6 +639,18 @@ export function clearTokenSizeMattersGraphics(token) {
     }
   }
   token.sizeMattersImage = null;
+
+  if (token.sizeMattersTokenImage) {
+    try {
+      if (token.sizeMattersTokenImage.parent) {
+        token.sizeMattersTokenImage.parent.removeChild(token.sizeMattersTokenImage);
+      }
+      token.sizeMattersTokenImage.destroy(false);
+    } catch (error) {
+      console.warn("Size Matters: Erro ao destruir sprite da imagem do token", error);
+    }
+  }
+  token.sizeMattersTokenImage = null;
 
   if (token.sizeMattersGridTicker) {
     try {

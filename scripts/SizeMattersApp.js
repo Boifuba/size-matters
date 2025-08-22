@@ -10,7 +10,6 @@ import {
   clearTokenSizeMattersGraphics,
   clearAllSizeMattersGraphics,
 } from "./token-graphics.js";
-import { SettingsManager } from './settings-manager.js';
 import { PresetManagerApp } from './PresetManagerApp.js';
 import { DEFAULT_SETTINGS, MESSAGES } from './constants.js';
 
@@ -70,17 +69,34 @@ export class SizeMattersApp extends Application {
       ? this.token.document.getFlag("size-matters", "settings") || {}
       : {};
 
-    // Load global defaults first
+    // Load global defaults first (WITHOUT IMAGE SETTINGS)
     const globalDefaults = game.ready 
       ? game.settings.get("size-matters", "globalDefaults") || {}
-      : DEFAULT_SETTINGS;
+      : {};
 
-
-    // Merge in order: defaults -> global -> token-specific
-    this.settings = foundry.utils.mergeObject(
-      DEFAULT_SETTINGS,
-      globalDefaults
-    );
+    // Start with DEFAULT_SETTINGS as base
+    this.settings = foundry.utils.duplicate(DEFAULT_SETTINGS);
+    
+    // Apply global defaults (but NEVER image settings)
+    const safeGlobalDefaults = {
+      color: globalDefaults.color,
+      fillColor: globalDefaults.fillColor,
+      thickness: globalDefaults.thickness,
+      alpha: globalDefaults.alpha,
+      enableFill: globalDefaults.enableFill,
+      enableContour: globalDefaults.enableContour,
+      zoomLevel: globalDefaults.zoomLevel,
+      // ❌ NEVER MERGE IMAGE SETTINGS FROM GLOBAL DEFAULTS
+    };
+    
+    // Remove any undefined values
+    Object.keys(safeGlobalDefaults).forEach(key => {
+      if (safeGlobalDefaults[key] !== undefined) {
+        this.settings[key] = safeGlobalDefaults[key];
+      }
+    });
+    
+    // Finally, apply token-specific settings (including images)
     this.settings = foundry.utils.mergeObject(this.settings, tokenSettings);
 
     if (tokenSettings.grid) {
@@ -111,13 +127,15 @@ export class SizeMattersApp extends Application {
   }
 
   async loadPreset(name) {
-    // Delegate to PresetManagerApp for consistency
+    // Import here to avoid circular dependency
+    const { PresetManagerApp } = await import('./PresetManagerApp.js');
     const presetManager = new PresetManagerApp(this);
     return await presetManager.applyPreset(name);
   }
 
   async saveGlobalDefaults() {
-    // Save general settings (excluding grid) as global defaults
+    // Save general settings (excluding grid and ALL image settings) as global defaults
+    // IMAGES SHOULD NEVER BE SAVED AS GLOBAL DEFAULTS
     const globalSettings = {
       color: this.settings.color,
       fillColor: this.settings.fillColor,
@@ -125,20 +143,33 @@ export class SizeMattersApp extends Application {
       alpha: this.settings.alpha,
       enableFill: this.settings.enableFill,
       enableContour: this.settings.enableContour,
-      imageUrl: this.settings.imageUrl,
-      imageScale: this.settings.imageScale,
-      imageOffsetX: this.settings.imageOffsetX,
-      imageOffsetY: this.settings.imageOffsetY,
-      imageRotation: this.settings.imageRotation,
-      imageVisible: this.settings.imageVisible,
       zoomLevel: this.settings.zoomLevel,
+      // ❌ NEVER SAVE IMAGE SETTINGS AS GLOBAL DEFAULTS:
+      // imageUrl: this.settings.imageUrl,
+      // imageScale: this.settings.imageScale,
+      // imageOffsetX: this.settings.imageOffsetX,
+      // imageOffsetY: this.settings.imageOffsetY,
+      // imageRotation: this.settings.imageRotation,
+      // imageVisible: this.settings.imageVisible,
     };
 
     await game.settings.set("size-matters", "globalDefaults", globalSettings);
   }
 
   async clearGlobalDefaults() {
-    await game.settings.set("size-matters", "globalDefaults", { ...DEFAULT_SETTINGS });
+    // Create clean defaults without any image settings
+    const cleanDefaults = {
+      color: DEFAULT_SETTINGS.color,
+      fillColor: DEFAULT_SETTINGS.fillColor,
+      thickness: DEFAULT_SETTINGS.thickness,
+      alpha: DEFAULT_SETTINGS.alpha,
+      enableFill: DEFAULT_SETTINGS.enableFill,
+      enableContour: DEFAULT_SETTINGS.enableContour,
+      zoomLevel: DEFAULT_SETTINGS.zoomLevel,
+      // ❌ NEVER INCLUDE IMAGE SETTINGS IN GLOBAL DEFAULTS
+    };
+    
+    await game.settings.set("size-matters", "globalDefaults", cleanDefaults);
   }
 
   // Debounced save to prevent excessive saves
@@ -164,13 +195,6 @@ export class SizeMattersApp extends Application {
     await this.drawGrid(html);
   }
 
-  async loadPreset(name) {
-    // Import here to avoid circular dependency
-    const { PresetManagerApp } = await import('./PresetManagerApp.js');
-    const presetManager = new PresetManagerApp(this);
-    return await presetManager.applyPreset(name);
-  }
-
   getData() {
     if (!this.token) {
       return {
@@ -181,10 +205,7 @@ export class SizeMattersApp extends Application {
           '<div style="text-align: center; padding: 40px; color: #666;">Select a token to configure</div>',
         isPointyTop: false,
         isHexGrid: false,
-        enableDirectionalHighlight: game.settings.get(
-          "size-matters",
-          "enableDirectionalHighlight"
-        ),
+        enableDirectionalHighlight: this.settings.enableDirectionalHighlight,
         ...this.settings,
       };
     }
@@ -206,13 +227,7 @@ export class SizeMattersApp extends Application {
           : "Flat-Top Hex"
         : "Square Grid",
       gridSize: canvas.grid.size,
-      gridSVG: this.createGridSVG(isHexGrid, isPointyTop),
-      isPointyTop: isPointyTop,
-      isHexGrid: isHexGrid,
-      enableDirectionalHighlight: game.settings.get(
-        "size-matters",
-        "enableDirectionalHighlight"
-      ),
+      enableDirectionalHighlight: this.settings.enableDirectionalHighlight,
       ...this.settings,
     };
   }
@@ -221,7 +236,15 @@ export class SizeMattersApp extends Application {
     const svgSize = 300;
     // Atualizar o grid no manager antes de criar o SVG
     this.gridManager.setGrid(this.grid);
-    return this.gridManager.createGridSVG(isHexGrid, isPointyTop, svgSize);
+    
+    // Criar uma cópia temporária das configurações apenas para a visualização do módulo
+    const tempSettings = { ...this.settings };
+    // Aumentar o imageScale apenas para a visualização (1.5x maior)
+    if (tempSettings.imageScale) {
+      tempSettings.imageScale = tempSettings.imageScale * 1.8;
+    }
+    
+    return this.gridManager.createGridSVG(isHexGrid, isPointyTop, svgSize, this.token, tempSettings);
   }
 
   updateGridSVG(html) {
@@ -248,83 +271,98 @@ export class SizeMattersApp extends Application {
 
   activateListeners(html) {
     super.activateListeners(html);
+    
+    // Prevent form submission that causes page reload
+    html.find('form').on('submit', (event) => {
+      event.preventDefault();
+      return false;
+    });
+    
     this.drawGrid(html);
     this.setupGridInteraction(html);
     this.setupAccordions(html);
 
     // Opacity input with real-time validation and update
     html.find('input[name="alpha"]').on("input", (event) => {
-      let value = parseFloat(event.target.value);
+      let value = parseFloat(event.target.value.replace(',', '.'));
 
       // Clamp value between 0 and 1
       if (isNaN(value) || value < 0) value = 0;
       if (value > 1) value = 1;
 
-      // Update the input field with clamped value
-      event.target.value = value;
-
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.alpha = value;
+      this.saveAndDraw(html);
     });
 
+    // Prevent Enter key from submitting form on opacity input
+    html.find('input[name="alpha"]').on("keydown", (event) => {
+      if (event.key === 'Enter' || event.keyCode === 13) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.target.blur(); // Remove focus from input
+        return false;
+      }
+    });
+
+    // Additional prevention for all inputs
+    html.find('input, select, textarea').on("keydown", (event) => {
+      if (event.key === 'Enter' || event.keyCode === 13) {
+        // Only prevent if it's not a textarea (where Enter should work normally)
+        if (event.target.tagName.toLowerCase() !== 'textarea') {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+        }
+      }
+    });
     // Real-time updates for other controls
     html.find('input[name="imageScale"]').on("input", (event) => {
       html.find("#sval").text(event.target.value);
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.imageScale = parseFloat(event.target.value.replace(',', '.')) || 1.0;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="imageOffsetX"]').on("input", (event) => {
       html.find("#xval").text(event.target.value);
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.imageOffsetX = parseInt(event.target.value) || 0;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="imageOffsetY"]').on("input", (event) => {
       html.find("#yval").text(event.target.value);
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.imageOffsetY = parseInt(event.target.value) || 0;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="imageRotation"]').on("input", (event) => {
       html.find("#rval").text(event.target.value);
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.imageRotation = parseInt(event.target.value) || 0;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="color"]').on("change", (event) => {
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.color = event.target.value;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="fillColor"]').on("change", (event) => {
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.fillColor = event.target.value;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="enableFill"]').on("change", (event) => {
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.enableFill = event.target.checked;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="enableContour"]').on("change", (event) => {
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.enableContour = event.target.checked;
+      this.saveAndDraw(html);
     });
 
     html.find('input[name="imageVisible"]').on("change", (event) => {
-      this.updateSettingsFromForm(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.settings.imageVisible = event.target.checked;
+      this.saveAndDraw(html);
     });
 
     // Zoom level changes with immediate update
@@ -332,8 +370,7 @@ export class SizeMattersApp extends Application {
       this.settings.zoomLevel = event.target.value;
       this.initializeGrid();
       this.updateGridSVG(html);
-      this.drawGrid(html);
-      this.saveSettings();
+      this.immediateRedraw(html);
     });
 
     // Radio button changes for zoom level
@@ -342,8 +379,7 @@ export class SizeMattersApp extends Application {
         this.settings.zoomLevel = event.target.value;
         this.initializeGrid();
         this.updateGridSVG(html);
-        this.drawGrid(html);
-        this.saveSettings();
+        this.immediateRedraw(html);
       }
     });
 
@@ -352,9 +388,8 @@ export class SizeMattersApp extends Application {
       .find('input[name="enableDirectionalHighlight"]')
       .on("change", (event) => {
         const isEnabled = event.target.checked;
-        // Usar o SettingsManager para atualizar a configuração
-        SettingsManager.setDirectionalHighlight(isEnabled);
-        this.drawGrid(html);
+        this.settings.enableDirectionalHighlight = isEnabled;
+        this.saveAndDraw(html);
       });
 
     // Button handlers
@@ -372,8 +407,7 @@ export class SizeMattersApp extends Application {
         1,
         this.settings.redLineAdjustment + 1
       );
-      this.saveSettings();
-      this.drawGrid(html);
+      this.saveAndDraw(html);
     });
 
     html.find(".sm-remove-red-btn").click(() => {
@@ -381,8 +415,7 @@ export class SizeMattersApp extends Application {
         -1,
         this.settings.redLineAdjustment - 1
       );
-      this.saveSettings();
-      this.drawGrid(html);
+      this.saveAndDraw(html);
     });
 
     html.find(".sm-add-green-btn").click(() => {
@@ -390,8 +423,7 @@ export class SizeMattersApp extends Application {
         1,
         this.settings.greenLineAdjustment + 1
       );
-      this.saveSettings();
-      this.drawGrid(html);
+      this.saveAndDraw(html);
     });
 
     html.find(".sm-remove-green-btn").click(() => {
@@ -399,8 +431,7 @@ export class SizeMattersApp extends Application {
         -1,
         this.settings.greenLineAdjustment - 1
       );
-      this.saveSettings();
-      this.drawGrid(html);
+      this.saveAndDraw(html);
     });
 
     // Zoom button handlers
@@ -419,8 +450,7 @@ export class SizeMattersApp extends Application {
         this.settings.zoomLevel = newZoom;
         this.initializeGrid();
         this.updateGridSVG(html);
-        this.drawGrid(html);
-        this.saveSettings();
+        this.immediateRedraw(html);
       }
     });
 
@@ -437,10 +467,10 @@ export class SizeMattersApp extends Application {
 
       if (newZoom !== currentZoom) {
         this.settings.zoomLevel = newZoom;
+        this.settings.grid = this.grid;
         this.initializeGrid();
         this.updateGridSVG(html);
-        this.drawGrid(html);
-        this.saveSettings();
+        this.immediateRedraw(html);
       }
     });
 
@@ -534,6 +564,7 @@ export class SizeMattersApp extends Application {
     html.find("#yval").text(this.settings.imageOffsetY);
     html.find('[name="imageRotation"]').val(this.settings.imageRotation);
     html.find("#rval").text(this.settings.imageRotation);
+    html.find('[name="imageVisible"]').prop("checked", this.settings.imageVisible);
   }
 
   async openFilePicker(html) {
@@ -575,7 +606,7 @@ export class SizeMattersApp extends Application {
     this.settings.fillColor = html.find('[name="fillColor"]').val();
 
     // Parse opacity input with validation
-    let alpha = parseFloat(html.find('[name="alpha"]').val());
+    let alpha = parseFloat(html.find('[name="alpha"]').val().replace(',', '.'));
     if (isNaN(alpha) || alpha < 0) alpha = 0;
     if (alpha > 1) alpha = 1;
     this.settings.alpha = alpha;
@@ -585,7 +616,7 @@ export class SizeMattersApp extends Application {
       .find('[name="enableContour"]')
       .is(":checked");
     this.settings.imageScale =
-      parseFloat(html.find('[name="imageScale"]').val()) || 1.0;
+      parseFloat(html.find('[name="imageScale"]').val().replace(',', '.')) || 1.0;
     this.settings.imageOffsetX =
       parseInt(html.find('[name="imageOffsetX"]').val()) || 0;
     this.settings.imageOffsetY =
@@ -635,23 +666,46 @@ export class SizeMattersApp extends Application {
       ui.notifications.warn(MESSAGES.SELECT_TOKEN_FIRST);
       return;
     }
-    this.clearTokenGraphics();
 
-    this.settings = { ...DEFAULT_SETTINGS };
+    
+    // Clear token graphics first (if desired, but for now, we'll keep the token visible)
+    // this.clearTokenGraphics();
+
+    // Reset settings to defaults
+    this.settings = foundry.utils.duplicate(DEFAULT_SETTINGS);
 
     // Reset grid manager and reinitialize
     this.grid = this.gridManager.initializeGrid("medium");
     this.settings.grid = this.grid;
 
+    // Do NOT clear the global texture cache here — it can invalidate Foundry's own textures (tokens, grid)
+    // clearTextureCache();
+
+    // Clear global defaults
     await this.clearGlobalDefaults();
 
+    // Clear token-specific settings
     if (this.token) {
       await this.token.document.unsetFlag("size-matters", "settings");
     }
+
+    // Force immediate save of cleared settings
+    await this.saveSettings();
+
+    // Update form with cleared values
     if (html) {
       this.updateFormFromSettings(html);
       this.updateGridSVG(html);
+      
+      // Force redraw with cleared settings
+      await this.drawGrid(html);
     }
+
+    // Force canvas refresh to ensure graphics are cleared
+    if (this.token) {
+      await drawSizeMattersGraphicsForToken(this.token);
+    }
+
     ui.notifications.info("All settings cleared and reset to default!");
   }
 

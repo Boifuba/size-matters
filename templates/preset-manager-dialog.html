@@ -20,9 +20,13 @@
         <div class="sm-preset-thumbnail">
           {{#if imageUrl}}
             {{#if isVideo}}
-              <video src="{{imageUrl}}" class="sm-preset-video" autoplay loop muted playsinline></video>
+              <video src="{{imageUrl}}" class="sm-preset-video" autoplay loop muted playsinline preload="metadata"></video>
             {{else}}
-              <img src="{{imageUrl}}" alt="{{name}}" class="sm-preset-image">
+              <img src="{{imageUrl}}" alt="{{name}}" class="sm-preset-image" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+              <div class="sm-preset-no-image" style="display: none;">
+                <i class="fas fa-image"></i>
+                <span>Image Error</span>
+              </div>
             {{/if}}
           {{else}}
             <div class="sm-preset-no-image">
