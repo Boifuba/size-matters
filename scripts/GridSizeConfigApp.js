@@ -4,6 +4,11 @@
  */
 
 export class GridSizeConfigApp extends FormApplication {
+  constructor(sizeMattersApp = null, options = {}) {
+    super(options);
+    this.sizeMattersApp = sizeMattersApp;
+  }
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       id: "grid-size-config",
@@ -61,9 +66,9 @@ export class GridSizeConfigApp extends FormApplication {
     ui.notifications.info("Grid size configuration updated!");
 
     // Update any open Size Matters windows
-    if (window.sizeMattersApp && window.sizeMattersApp.rendered) {
-      window.sizeMattersApp.initializeGrid();
-      window.sizeMattersApp.render(true);
+    if (this.sizeMattersApp && this.sizeMattersApp.rendered) {
+      this.sizeMattersApp.initializeGrid();
+      this.sizeMattersApp.render(true);
     }
   }
 }

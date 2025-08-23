@@ -15,6 +15,9 @@
 // Global storage for active rides
 window.sizeMattersActiveRides = window.sizeMattersActiveRides || new Map();
 
+// Create a reference to the global variable for easier access
+const activeRides = window.sizeMattersActiveRides;
+
 /**
  * Creates a Foundry hook that monitors leader token updates and moves followers accordingly
  * 
@@ -137,7 +140,7 @@ async function startTokenRide(leaderToken, followersMap) {
     startTime: Date.now()
   };
 
-  window.sizeMattersActiveRides.set(rideId, rideData);
+  activeRides.set(rideId, rideData);
 
   // Set flags for persistence across scene reloads
   try {
@@ -151,7 +154,7 @@ async function startTokenRide(leaderToken, followersMap) {
   } catch (error) {
     // Cleanup on failure
     Hooks.off("updateToken", hookId);
-    window.sizeMattersActiveRides.delete(rideId);
+    activeRides.delete(rideId);
     throw new Error("Failed to set leader token flags: " + error.message);
   }
 
@@ -176,12 +179,12 @@ async function stopTokenRide(leaderTokenOrDocument, suppressNotification = false
   if (!rideId) return;
 
   // Remove from active rides and unhook
-  if (window.sizeMattersActiveRides.has(rideId)) {
-    const rideData = window.sizeMattersActiveRides.get(rideId);
+  if (activeRides.has(rideId)) {
+    const rideData = activeRides.get(rideId);
     if (rideData.hookId) {
       Hooks.off("updateToken", rideData.hookId);
     }
-    window.sizeMattersActiveRides.delete(rideId);
+    activeRides.delete(rideId);
   }
 
   // Clean up persistence flags
@@ -212,9 +215,9 @@ async function removeFollowerFromTokenRide(leaderTokenOrDocument, followerId) {
   const leaderId = leaderDocument.id;
 
   const rideId = leaderDocument.getFlag('size-matters', 'activeRideId');
-  if (!rideId || !window.sizeMattersActiveRides.has(rideId)) return false;
+  if (!rideId || !activeRides.has(rideId)) return false;
 
-  const rideData = window.sizeMattersActiveRides.get(rideId);
+  const rideData = activeRides.get(rideId);
   if (!rideData.followers.has(followerId)) return false;
 
   const followerName = rideData.followers.get(followerId).name;
@@ -246,11 +249,11 @@ async function removeFollowerFromTokenRide(leaderTokenOrDocument, followerId) {
  * Stops all active token rides
  */
 async function stopAllTokenRides() {
-  const rideIds = Array.from(window.sizeMattersActiveRides.keys());
+  const rideIds = Array.from(activeRides.keys());
   if (rideIds.length === 0) return;
 
   for (const rideId of rideIds) {
-    const rideData = window.sizeMattersActiveRides.get(rideId);
+    const rideData = activeRides.get(rideId);
     if (rideData) {
       const leaderToken = canvas.tokens.get(rideData.leaderId);
       if (leaderToken) {
@@ -273,7 +276,7 @@ async function restoreRidesFromFlags() {
     const rideId = token.document.getFlag('size-matters', 'activeRideId');
     const followersData = token.document.getFlag('size-matters', 'rideFollowers');
     
-    if (rideId && followersData && !window.sizeMattersActiveRides.has(rideId)) {
+    if (rideId && followersData && !activeRides.has(rideId)) {
       const followersMap = new Map(Object.entries(followersData));
       
       if (followersMap.size > 0) {
@@ -310,7 +313,7 @@ async function restoreRidesFromFlags() {
  */
 function getActiveRideGroups() {
   const activeGroups = new Map();
-  window.sizeMattersActiveRides.forEach((rideData) => {
+  activeRides.forEach((rideData) => {
     activeGroups.set(rideData.leaderId, {
       leaderName: rideData.leaderName,
       followers: rideData.followers
@@ -324,11 +327,13 @@ function getActiveRideGroups() {
  * Select multiple tokens (followers first, leader last) and run this function
  * Run again to disable
  */
+let quickFollowHook = null;
+
 function toggleQuickFollow() {
   // If already active, turn off
-  if (window.quickFollowHook) {
-    Hooks.off("updateToken", window.quickFollowHook);
-    delete window.quickFollowHook;
+  if (quickFollowHook) {
+    Hooks.off("updateToken", quickFollowHook);
+    quickFollowHook = null;
     ui.notifications.info("Quick Follow disabled");
     return;
   }
@@ -351,7 +356,7 @@ function toggleQuickFollow() {
   }));
   
   // Create temporary hook for quick follow
-  window.quickFollowHook = Hooks.on("updateToken", (tokenDocument, updateData) => {
+  quickFollowHook = Hooks.on("updateToken", (tokenDocument, updateData) => {
     if (tokenDocument.id !== leader.id) return;
     
     const rotation = ((updateData.rotation ?? tokenDocument.rotation) * Math.PI) / 180;
@@ -455,26 +460,13 @@ function showRideManagementDialog() {
     });
     
     content += `</ul>`;
-    content += `<button type="button" onclick="window.sizeMattersStopRide('${leaderId}')" style='background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;'>Stop Ride</button>`;
+    content += `<button type="button" class="stop-ride-btn" data-leader-id="${leaderId}" style='background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;'>Stop Ride</button>`;
     content += `</div>`;
   });
   
   content += "</div>";
   
-  // Create global function for stopping rides from dialog
-  window.sizeMattersStopRide = async function(leaderId) {
-    const leaderDocument = canvas.scene.tokens.get(leaderId);
-    if (leaderDocument) {
-      await stopTokenRide(leaderDocument);
-      // Close and reopen dialog to refresh
-      Object.values(ui.windows).forEach(app => {
-        if (app.title === "Manage Rides") app.close();
-      });
-      setTimeout(() => showRideManagementDialog(), 100);
-    }
-  };
-  
-  new Dialog({
+  const dialog = new Dialog({
     title: "Manage Rides",
     content: content,
     buttons: {
@@ -489,5 +481,23 @@ function showRideManagementDialog() {
       }
     },
     default: "close"
-  }).render(true);
+  });
+  
+  dialog.render(true);
+  
+  // Add event listeners after dialog is rendered
+  setTimeout(() => {
+    const dialogElement = dialog.element;
+    if (dialogElement) {
+      dialogElement.find('.stop-ride-btn').click(async (event) => {
+        const leaderId = event.currentTarget.dataset.leaderId;
+        const leaderDocument = canvas.scene.tokens.get(leaderId);
+        if (leaderDocument) {
+          await stopTokenRide(leaderDocument);
+          dialog.close();
+          setTimeout(() => showRideManagementDialog(), 100);
+        }
+      });
+    }
+  }, 100);
 }

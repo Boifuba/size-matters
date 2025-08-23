@@ -4,14 +4,13 @@
  */
 
 import { GridManager } from "./grid-manager.js";
-import { getTexture, clearTextureCache } from "./texture-utils.js";
 import {
   drawSizeMattersGraphicsForToken,
   clearTokenSizeMattersGraphics,
-  clearAllSizeMattersGraphics,
 } from "./token-graphics.js";
 import { PresetManagerApp } from './PresetManagerApp.js';
 import { DEFAULT_SETTINGS, MESSAGES } from './constants.js';
+import { pixelToAxial, pixelToSquare } from './grid-utils.js';
 
 export class SizeMattersApp extends Application {
   constructor(token = null, options = {}) {
@@ -19,6 +18,8 @@ export class SizeMattersApp extends Application {
     this.token = token;
     this.tokenId = token ? token.id : null;
     this.gridManager = new GridManager();
+    this.pixiApp = null;
+    this.gridGraphics = null;
     this._isInitialized = false;
     this._openedBeforeReady = !game.ready;
     
@@ -38,7 +39,7 @@ export class SizeMattersApp extends Application {
       title: "Yes, Size Matters!",
       template: "modules/size-matters/templates/size-matters-dialog.html",
       width: 420,
-      height: "auto",
+      height: 700,
       resizable: false,
       closeOnSubmit: false,
     });
@@ -53,8 +54,85 @@ export class SizeMattersApp extends Application {
     }
 
     const result = await super.render(force, options);
-
     return result;
+  }
+
+  async initializePixiPreview() {
+    if (this.pixiApp) {
+      return; // Already initialized
+    }
+
+    const canvas = this.element.find('#sm-grid-preview-canvas')[0];
+    if (!canvas) {
+      console.warn('Size Matters: Grid preview canvas not found');
+      return;
+    }
+
+    try {
+      this.pixiApp = new PIXI.Application({
+        view: canvas,
+        width: 350,
+        height: 350,
+        backgroundColor: 0xfafaf5,
+        antialias: true,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
+      });
+      
+      // CONFIGURAÇÃO CRÍTICA DO CANVAS
+      this.pixiApp.view.style.pointerEvents = 'auto';
+      this.pixiApp.view.style.cursor = 'pointer';
+      this.pixiApp.view.style.touchAction = 'none'; // Previne scroll em mobile
+
+      this.gridGraphics = new PIXI.Graphics();
+      
+      // CONFIGURAÇÃO MÁXIMA DE INTERATIVIDADE
+      this.gridGraphics.interactive = true;
+      this.gridGraphics.interactiveChildren = false;
+      this.gridGraphics.hitArea = new PIXI.Rectangle(0, 0, 350, 350); // Área de hit completa
+      this.gridGraphics.eventMode = 'static'; // FORÇA captura de eventos
+      this.gridGraphics.cursor = 'pointer';
+      
+      // zIndex MÁXIMO para ficar no topo SEMPRE
+      this.gridGraphics.zIndex = 0;
+      
+      this.pixiApp.stage.addChild(this.gridGraphics);
+      
+      // FORÇA sorting por zIndex
+      this.pixiApp.stage.sortableChildren = true;
+      this.pixiApp.stage.sortDirty = true;
+      
+      console.log('Size Matters: Grid graphics - zIndex:', this.gridGraphics.zIndex, 'interactive:', this.gridGraphics.interactive, 'eventMode:', this.gridGraphics.eventMode);
+
+      // Draw initial grid
+      await this.redrawGridPreview();
+    } catch (error) {
+      console.error('Size Matters: Failed to initialize PIXI preview:', error);
+    }
+  }
+
+  async redrawGridPreview() {
+    if (!this.gridGraphics || !this.gridManager) {
+      return;
+    }
+
+    try {
+      await this.gridManager.drawGridPreview(this.gridGraphics, this.token, this.settings);
+      
+      // FORÇA TOTAL refresh do stage
+      if (this.pixiApp && this.pixiApp.stage) {
+        this.pixiApp.stage.sortDirty = true;
+        this.pixiApp.stage.sortableChildren = true;
+        
+        // FORÇA o grid graphics para o topo
+        this.gridGraphics.zIndex = 0;
+        this.gridGraphics.parent.setChildIndex(this.gridGraphics, this.gridGraphics.parent.children.length - 1);
+      }
+      
+      console.log('Size Matters: Grid redrawn - zIndex:', this.gridGraphics.zIndex, 'interactive:', this.gridGraphics.interactive, 'children count:', this.pixiApp.stage.children.length);
+    } catch (error) {
+      console.error('Size Matters: Failed to redraw grid preview:', error);
+    }
   }
 
   initializeGrid() {
@@ -120,10 +198,23 @@ export class SizeMattersApp extends Application {
   }
 
   async setControlledToken(token) {
+    // Clear graphics from old token first
+    if (this.token && this.token.id !== (token ? token.id : null)) {
+      clearTokenSizeMattersGraphics(this.token);
+    }
+
     this.token = token;
     this.tokenId = token ? token.id : null;
     this.loadSettings();
-    this.render(false);
+    
+    // Update form fields with new settings
+    if (this.element && this.element.length > 0) {
+      this.updateFormFromSettings(this.element);
+      
+      // Force complete redraw with new token data
+      await this.redrawGridPreview();
+      await this.drawGrid(this.element);
+    }
   }
 
   async loadPreset(name) {
@@ -172,21 +263,26 @@ export class SizeMattersApp extends Application {
     await game.settings.set("size-matters", "globalDefaults", cleanDefaults);
   }
 
-  // Debounced save to prevent excessive saves
-  debouncedSave = foundry.utils.debounce(async () => {
-    await this.saveSettings();
-    await this.saveGlobalDefaults();
+  // Consolidated debounced handler to prevent excessive saves and redraws
+  debouncedSaveAndDraw = foundry.utils.debounce(async (html) => {
+    try {
+      // Save settings and global defaults
+      await this.saveSettings();
+      await this.saveGlobalDefaults();
+      
+      // Redraw grid if html is provided
+      if (html) {
+        await this.drawGrid(html);
+      }
+    } catch (error) {
+      console.error("Size Matters: Error in debounced save and draw:", error);
+      ui.notifications.error("Failed to save settings or update display");
+    }
   }, 300);
 
-  // Debounced draw to prevent excessive redraws
-  debouncedDraw = foundry.utils.debounce(async (html) => {
-    await this.drawGrid(html);
-  }, 100);
-
-  // Method to trigger optimized save and draw
+  // Method to trigger consolidated save and draw
   async saveAndDraw(html) {
-    this.debouncedSave();
-    this.debouncedDraw(html);
+    this.debouncedSaveAndDraw(html);
   }
 
   async immediateRedraw(html) {
@@ -201,8 +297,6 @@ export class SizeMattersApp extends Application {
         noToken: true,
         gridType: "No Token Selected",
         gridSize: 0,
-        gridSVG:
-          '<div style="text-align: center; padding: 40px; color: #666;">Select a token to configure</div>',
         isPointyTop: false,
         isHexGrid: false,
         enableDirectionalHighlight: this.settings.enableDirectionalHighlight,
@@ -232,45 +326,16 @@ export class SizeMattersApp extends Application {
     };
   }
 
-  createGridSVG(isHexGrid, isPointyTop) {
-    const svgSize = 300;
-    // Atualizar o grid no manager antes de criar o SVG
-    this.gridManager.setGrid(this.grid);
-    
-    // Criar uma cópia temporária das configurações apenas para a visualização do módulo
-    const tempSettings = { ...this.settings };
-    // Aumentar o imageScale apenas para a visualização (1.5x maior)
-    if (tempSettings.imageScale) {
-      tempSettings.imageScale = tempSettings.imageScale * 1.8;
-    }
-    
-    return this.gridManager.createGridSVG(isHexGrid, isPointyTop, svgSize, this.token, tempSettings);
-  }
-
-  updateGridSVG(html) {
-    const gridType = canvas.grid.type;
-    const isHexGrid = [
-      CONST.GRID_TYPES.HEXODDR,
-      CONST.GRID_TYPES.HEXEVENR,
-      CONST.GRID_TYPES.HEXODDQ,
-      CONST.GRID_TYPES.HEXEVENQ,
-    ].includes(gridType);
-    const isPointyTop = [
-      CONST.GRID_TYPES.HEXODDR,
-      CONST.GRID_TYPES.HEXEVENR,
-    ].includes(gridType);
-
-    const newSVG = this.createGridSVG(isHexGrid, isPointyTop);
-    html.find(".sm-grid-container").html(newSVG);
-    html.find("polygon[data-grid], rect[data-grid]").click((event) => {
-      const key = event.currentTarget.getAttribute("data-grid");
-      this.toggleGridCell(key, event.currentTarget);
-      this.drawGrid(html);
-    });
-  }
-
   activateListeners(html) {
     super.activateListeners(html);
+    
+    // Initialize PIXI preview first, after HTML is rendered and in DOM
+    this.initializePixiPreview().then(() => {
+      this.setupGridInteraction(html);
+      this.drawGrid(html);
+    }).catch(error => {
+      console.error('Size Matters: Failed to initialize PIXI preview:', error);
+    });
     
     // Prevent form submission that causes page reload
     html.find('form').on('submit', (event) => {
@@ -278,8 +343,6 @@ export class SizeMattersApp extends Application {
       return false;
     });
     
-    this.drawGrid(html);
-    this.setupGridInteraction(html);
     this.setupAccordions(html);
 
     // Opacity input with real-time validation and update
@@ -350,18 +413,44 @@ export class SizeMattersApp extends Application {
       this.saveAndDraw(html);
     });
 
-    html.find('input[name="enableFill"]').on("change", (event) => {
+    // Switch handlers for toggles
+    html.find('.sm-switch input[name="enableFill"]').on("change", (event) => {
       this.settings.enableFill = event.target.checked;
       this.saveAndDraw(html);
     });
 
-    html.find('input[name="enableContour"]').on("change", (event) => {
+    html.find('.sm-switch input[name="enableContour"]').on("change", (event) => {
       this.settings.enableContour = event.target.checked;
       this.saveAndDraw(html);
     });
 
-    html.find('input[name="imageVisible"]').on("change", (event) => {
+    html.find('.sm-switch input[name="imageVisible"]').on("change", (event) => {
       this.settings.imageVisible = event.target.checked;
+      this.saveAndDraw(html);
+    });
+
+    html.find('.sm-switch input[name="enableDirectionalHighlight"]').on("change", (event) => {
+      this.settings.enableDirectionalHighlight = event.target.checked;
+      this.saveAndDraw(html);
+    });
+    // Switch handlers for toggles
+    html.find('.sm-toggle-switch input[name="enableFill"]').on("change", (event) => {
+      this.settings.enableFill = event.target.checked;
+      this.saveAndDraw(html);
+    });
+
+    html.find('.sm-toggle-switch input[name="enableContour"]').on("change", (event) => {
+      this.settings.enableContour = event.target.checked;
+      this.saveAndDraw(html);
+    });
+
+    html.find('.sm-toggle-switch input[name="imageVisible"]').on("change", (event) => {
+      this.settings.imageVisible = event.target.checked;
+      this.saveAndDraw(html);
+    });
+
+    html.find('.sm-toggle-switch input[name="enableDirectionalHighlight"]').on("change", (event) => {
+      this.settings.enableDirectionalHighlight = event.target.checked;
       this.saveAndDraw(html);
     });
 
@@ -369,7 +458,7 @@ export class SizeMattersApp extends Application {
     html.find('select[name="zoomLevel"]').on("change", (event) => {
       this.settings.zoomLevel = event.target.value;
       this.initializeGrid();
-      this.updateGridSVG(html);
+      this.redrawGridPreview();
       this.immediateRedraw(html);
     });
 
@@ -378,19 +467,10 @@ export class SizeMattersApp extends Application {
       if (event.target.checked) {
         this.settings.zoomLevel = event.target.value;
         this.initializeGrid();
-        this.updateGridSVG(html);
+        this.redrawGridPreview();
         this.immediateRedraw(html);
       }
     });
-
-    // Directional highlight toggle
-    html
-      .find('input[name="enableDirectionalHighlight"]')
-      .on("change", (event) => {
-        const isEnabled = event.target.checked;
-        this.settings.enableDirectionalHighlight = isEnabled;
-        this.saveAndDraw(html);
-      });
 
     // Button handlers
     html.find(".file-picker-button").click(() => this.openFilePicker(html));
@@ -449,7 +529,7 @@ export class SizeMattersApp extends Application {
       if (newZoom !== currentZoom) {
         this.settings.zoomLevel = newZoom;
         this.initializeGrid();
-        this.updateGridSVG(html);
+        this.redrawGridPreview();
         this.immediateRedraw(html);
       }
     });
@@ -469,7 +549,7 @@ export class SizeMattersApp extends Application {
         this.settings.zoomLevel = newZoom;
         this.settings.grid = this.grid;
         this.initializeGrid();
-        this.updateGridSVG(html);
+        this.redrawGridPreview();
         this.immediateRedraw(html);
       }
     });
@@ -502,50 +582,133 @@ export class SizeMattersApp extends Application {
   setupGridInteraction(html) {
     let isDragging = false;
     let dragMode = null;
-    const gridElements = html.find("polygon[data-grid], rect[data-grid]");
+    
+    if (!this.gridGraphics || !this.pixiApp) {
+      console.warn('Size Matters: Grid graphics or PIXI app not available for interaction setup');
+      return;
+    }
 
-    $(document).off("mouseup.size-matters");
+    // LIMPAR todos os listeners existentes
+    this.gridGraphics.removeAllListeners();
+    
+    // FORÇA configurações de interatividade novamente
+    this.gridGraphics.interactive = true;
+    this.gridGraphics.eventMode = 'static';
+    this.gridGraphics.cursor = 'pointer';
+    this.gridGraphics.zIndex = 0;
 
-    gridElements.on("mousedown", (event) => {
-      event.preventDefault();
-      const key = event.currentTarget.getAttribute("data-grid");
-      const cell = this.grid[key];
-      if (cell.isCenter) return;
-      isDragging = true;
-      dragMode = cell.selected ? "deselect" : "select";
-      this.toggleGridCell(key, event.currentTarget);
-      this.drawGrid(html);
-    });
-
-    gridElements.on("mouseenter", (event) => {
-      if (!isDragging) return;
-      const key = event.currentTarget.getAttribute("data-grid");
-      const cell = this.grid[key];
-      if (cell.isCenter) return;
-      if (
-        (dragMode === "select" && !cell.selected) ||
-        (dragMode === "deselect" && cell.selected)
-      ) {
-        this.toggleGridCell(key, event.currentTarget);
-        this.drawGrid(html);
+    // Handle pointer down (mouse/touch start)
+    this.gridGraphics.on('pointerdown', (event) => {
+      console.log('Size Matters: POINTER DOWN - event received at stage');
+      const localPos = event.data.getLocalPosition(this.gridGraphics);
+      const key = this.getGridCellFromPixelPosition(localPos.x, localPos.y);
+      
+      console.log('Size Matters: CLICK POSITION:', localPos.x, localPos.y, 'GRID CELL:', key);
+      
+      if (key) {
+        const cell = this.grid[key];
+        if (cell) {
+          isDragging = true;
+          dragMode = cell.selected ? "deselect" : "select";
+          this.toggleGridCell(key);
+          this.drawGrid(html);
+          console.log('Size Matters: CELL TOGGLED:', key, 'NEW STATE:', cell.selected);
+        }
       }
     });
 
-    $(document).on("mouseup.size-matters", () => {
+    // Handle pointer move (mouse/touch move)
+    this.gridGraphics.on('pointermove', (event) => {
+      const localPos = event.data.getLocalPosition(this.gridGraphics);
+      const key = this.getGridCellFromPixelPosition(localPos.x, localPos.y);
+      
+      if (isDragging && key) {
+        const cell = this.grid[key];
+        if (cell) {
+          if (
+            (dragMode === "select" && !cell.selected) ||
+            (dragMode === "deselect" && cell.selected)
+          ) {
+            this.toggleGridCell(key);
+            this.drawGrid(html);
+          }
+        }
+      }
+      
+      // Update cursor based on hover
+      if (!isDragging && key) {
+        const cell = this.grid[key];
+        if (cell) {
+          this.pixiApp.view.style.cursor = 'pointer';
+        } else {
+          this.pixiApp.view.style.cursor = 'pointer';
+        }
+      } else if (!isDragging) {
+        this.pixiApp.view.style.cursor = 'pointer';
+      }
+    });
+
+    // Handle pointer up (mouse/touch end)
+    this.gridGraphics.on('pointerup', () => {
+      console.log('Size Matters: POINTER UP - event received');
       isDragging = false;
       dragMode = null;
     });
 
-    html.find(".sm-grid-container").on("mouseleave", () => {
+    // Handle pointer up outside (mouse/touch end outside canvas)
+    this.gridGraphics.on('pointerupoutside', () => {
+      console.log('Size Matters: POINTER UP OUTSIDE - event received');
       isDragging = false;
       dragMode = null;
+      this.pixiApp.view.style.cursor = 'pointer';
     });
 
-    html.find(".sm-grid-container").on("selectstart", (event) => {
-      if (isDragging) {
-        event.preventDefault();
+    // Handle pointer leave
+    this.gridGraphics.on('pointerout', () => {
+      if (!isDragging) {
+        this.pixiApp.view.style.cursor = 'pointer';
       }
     });
+
+    console.log('Size Matters: INTERACTION SETUP COMPLETE - interactive:', this.gridGraphics.interactive, 'zIndex:', this.gridGraphics.zIndex, 'eventMode:', this.gridGraphics.eventMode);
+  }
+
+  getGridCellFromPixelPosition(x, y) {
+    // Canvas center coordinates
+    const centerX = 350 / 2;
+    const centerY = 350 / 2;
+    
+    // Convert to relative coordinates from center
+    const relativeX = x - centerX;
+    const relativeY = y - centerY;
+    
+    const gridType = canvas.grid.type;
+    const isHexGrid = [
+      CONST.GRID_TYPES.HEXODDR,
+      CONST.GRID_TYPES.HEXEVENR,
+      CONST.GRID_TYPES.HEXODDQ,
+      CONST.GRID_TYPES.HEXEVENQ,
+    ].includes(gridType);
+    const isPointyTop = [
+      CONST.GRID_TYPES.HEXODDR,
+      CONST.GRID_TYPES.HEXEVENR,
+    ].includes(gridType);
+    
+    if (isHexGrid) {
+      // Use precise hex grid coordinate conversion
+      const radius = this.gridManager.getSvgRadius();
+      const coords = pixelToAxial(relativeX, relativeY, radius, isPointyTop);
+      
+      const key = `${coords.q},${coords.r}`;
+      return this.grid[key] ? key : null;
+    } else {
+      // Use precise square grid coordinate conversion
+      const size = this.gridManager.getSquareSize();
+      const coords = pixelToSquare(relativeX, relativeY, size);
+      
+      const key = `${coords.x},${coords.y}`;
+      return this.grid[key] ? key : null;
+    }
   }
 
   updateFormFromSettings(html) {
@@ -565,38 +728,35 @@ export class SizeMattersApp extends Application {
     html.find('[name="imageRotation"]').val(this.settings.imageRotation);
     html.find("#rval").text(this.settings.imageRotation);
     html.find('[name="imageVisible"]').prop("checked", this.settings.imageVisible);
+    html.find('[name="enableDirectionalHighlight"]').prop("checked", this.settings.enableDirectionalHighlight);
   }
 
   async openFilePicker(html) {
     const fp = new FilePicker({
       type: "media",
       current: this.settings.imageUrl,
-      callback: (path) => {
+      callback: async (path) => {
         this.settings.imageUrl = path;
         this.settings.imageVisible = true;
-        this.saveSettings();
-        this.updateGridSVG(html);
-        this.drawGrid(html);
+        await this.saveSettings();
+        await this.redrawGridPreview();
+        await this.drawGrid(html);
       },
     });
     fp.render(true);
   }
 
-  toggleGridCell(key, element) {
+  toggleGridCell(key) {
     const cell = this.grid[key];
     if (!cell) return;
 
     cell.selected = !cell.selected;
     this.gridManager.setGrid(this.grid);
-    const fill = cell.selected ? "#2196F3" : "#ffffff";
-    element.setAttribute("fill", fill);
-    element.classList.toggle("sm-grid-selected", cell.selected);
-    element.classList.toggle("sm-grid-unselected", !cell.selected);
     this.settings.grid = this.grid;
 
     // Auto-save grid changes with immediate feedback
     this.saveSettings().then(() => {
-      this.drawGrid();
+      this.redrawGridPreview();
     });
   }
 
@@ -626,20 +786,21 @@ export class SizeMattersApp extends Application {
     this.settings.imageVisible = html
       .find('[name="imageVisible"]')
       .is(":checked");
+    this.settings.enableDirectionalHighlight = html
+      .find('[name="enableDirectionalHighlight"]')
+      .is(":checked");
     this.settings.grid = this.grid;
   }
 
   async drawGrid(html) {
-    if (!this.token) {
-      return;
-    }
     this.updateSettingsFromForm(html);
     this.settings.grid = this.grid;
+    
+    // Draw graphics for token (or clear if no token)
     await drawSizeMattersGraphicsForToken(this.token);
 
-    if (html) {
-      this.updateGridSVG(html);
-    }
+    // Redraw the PIXI preview
+    await this.redrawGridPreview();
   }
 
   async handleRideButton(html) {
@@ -691,15 +852,12 @@ export class SizeMattersApp extends Application {
 
     // Force immediate save of cleared settings
     await this.saveSettings();
-
-    // Update form with cleared values
-    if (html) {
-      this.updateFormFromSettings(html);
-      this.updateGridSVG(html);
-      
-      // Force redraw with cleared settings
-      await this.drawGrid(html);
-    }
+    
+    // Redraw grid preview with cleared settings
+    this.redrawGridPreview();
+    
+    // Force redraw with cleared settings
+    await this.drawGrid(html);
 
     // Force canvas refresh to ensure graphics are cleared
     if (this.token) {
@@ -709,8 +867,26 @@ export class SizeMattersApp extends Application {
     ui.notifications.info("All settings cleared and reset to default!");
   }
 
+  /**
+   * Configura um sprite para ser completamente não-interativo
+   * @param {PIXI.Sprite} sprite - O sprite a ser configurado
+   */
+  makeNonInteractive(sprite) {
+    sprite.interactive = false;
+    sprite.interactiveChildren = false;
+    sprite.buttonMode = false;
+    sprite.hitArea = null; // Remove hit area completamente
+    // Força o sprite a não capturar eventos de ponteiro
+    sprite.eventMode = 'none';
+  }
+
   async close(options = {}) {
-    $(document).off("mouseup.size-matters");
+    // Destroy PIXI application
+    if (this.pixiApp) {
+      this.pixiApp.destroy(true);
+      this.pixiApp = null;
+      this.gridGraphics = null;
+    }
 
     // Force immediate save before closing
     if (this.token) {

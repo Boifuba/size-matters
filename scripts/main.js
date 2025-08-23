@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Size Matters Module - Main Entry Point
+ * @description This module provides functionality for customizing token area effects,
+ * token riding systems, and preset management in Foundry VTT.
+ * @author Boifubá
+ * @alias jsdocs
+ */
+
 import {
   startTokenRide,
   stopTokenRide,
@@ -21,6 +29,252 @@ import { GridSizeConfigApp } from './GridSizeConfigApp.js';
 import { SizeMattersApp } from './SizeMattersApp.js';
 import { DEFAULT_SETTINGS, DIRECTIONAL_COLORS, MESSAGES, DEFAULT_GRID_SIZE_CONFIG } from './constants.js';
 
+// ================================
+// HOOK REGISTRY PATTERN
+// ================================
+
+/**
+ * Global array to store registered hook IDs for cleanup
+ * @type {Array<number>}
+ * @private
+ */
+const _sizeMattersRegisteredHooks = [];
+
+/**
+ * Cleans up previously registered hooks to prevent duplicates
+ * @private
+ * @returns {void}
+ */
+function _cleanupRegisteredHooks() {
+  _sizeMattersRegisteredHooks.forEach(hookId => {
+    try {
+      Hooks.off(hookId);
+    } catch (error) {
+      // Silent cleanup - hook may already be removed
+    }
+  });
+  _sizeMattersRegisteredHooks.length = 0;
+}
+
+/**
+ * Registers all module hooks with automatic cleanup
+ * @private
+ * @returns {void}
+ */
+function _registerAllModuleHooks() {
+  // Clean up any previously registered hooks
+  _cleanupRegisteredHooks();
+
+  // Register scene control buttons hook
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("getSceneControlButtons", (controls) => {
+      const tokenControls = controls.tokens;
+
+      if (tokenControls && tokenControls.tools) {
+        tokenControls.tools["size-matters-config-button"] = {
+          name: "size-matters-config-button",
+          title: "Size Matters Config",
+          icon: "fas fa-hexagon",
+          button: true,
+          onClick: () => {
+            game.modules.get("size-matters").api.openSizeMatters();
+          },
+          visible: game.user.isGM,
+        };
+      }
+    })
+  );
+
+  // Register chat message hook
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("chatMessage", (chatLog, message, chatData) => {
+      if (message.trim() === "/size-matters") {
+        game.modules.get("size-matters").api.openSizeMatters();
+        return false;
+      }
+      if (message.trim() === "/ride") {
+        game.modules.get("size-matters").api.openRideManager();
+        return false;
+      }
+    })
+  );
+
+  // Register token control hooks
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("controlToken", (token, controlled) => {
+      if (sizeMattersAppInstance && sizeMattersAppInstance.rendered) {
+        if (controlled) {
+          sizeMattersAppInstance.setControlledToken(token);
+        }
+      }
+    })
+  );
+
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("releaseToken", (token, controlled) => {
+      if (
+        sizeMattersAppInstance &&
+        sizeMattersAppInstance.rendered &&
+        canvas.tokens.controlled.length === 0
+      ) {
+        sizeMattersAppInstance.setControlledToken(null);
+      }
+    })
+  );
+
+  // Register canvas hooks
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("canvasInit", () => {
+      clearAllSizeMattersGraphics();
+    })
+  );
+
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("canvasReady", async () => {
+      await game.modules.get("size-matters").api.restoreRidesFromFlags();
+
+      for (const token of canvas.tokens.placeables) {
+        const settings = token.document.getFlag("size-matters", "settings");
+
+        if (settings && settings.grid) {
+          await drawSizeMattersGraphicsForToken(token);
+        } else if (!settings) {
+          clearTokenSizeMattersGraphics(token);
+        }
+      }
+    })
+  );
+
+  // Register token render hooks
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("renderToken", async (token) => {
+      const settings = token.document.getFlag("size-matters", "settings");
+
+      if (settings && settings.grid && !token.sizeMattersGrid) {
+        await drawSizeMattersGraphicsForToken(token);
+      } else if (!settings && token.sizeMattersGrid) {
+        clearTokenSizeMattersGraphics(token);
+      }
+    })
+  );
+
+  // Register token deletion hooks
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("preDeleteToken", (tokenDocument, options, userId) => {
+      const token = canvas.tokens.get(tokenDocument.id);
+      if (token) {
+        clearTokenSizeMattersGraphics(token);
+      }
+    })
+  );
+
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("deleteToken", async (tokenDocument, options, userId) => {
+      // Remove the associatedPreset flag from the actor
+      const token = canvas.tokens.get(tokenDocument.id);
+      if (token && token.actor) {
+        try {
+          await token.actor.unsetFlag("size-matters", "associatedPreset");
+        } catch (error) {
+          // Silent fail for cleanup
+        }
+      }
+
+      game.modules.get("size-matters").api.stopTokenRide(tokenDocument, true);
+    })
+  );
+
+  // Register scene update hook
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("updateScene", (scene, changes) => {
+      if (changes.active === true) {
+        clearAllSizeMattersGraphics();
+      }
+    })
+  );
+
+  // Register token update hook
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("updateToken", async (tokenDocument, changes, options, userId) => {
+      try {
+        if (changes.flags && changes.flags["size-matters"]) {
+          const token = canvas.tokens.get(tokenDocument.id);
+          if (!token) {
+            return;
+          }
+          clearTokenSizeMattersGraphics(token);
+          await drawSizeMattersGraphicsForToken(token);
+        }
+      } catch (error) {
+        // Silent error handling
+      }
+    })
+  );
+
+  // Register token HUD hook
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("renderTokenHUD", (app, html, data) => {
+      const $html = $(html);
+      if ($html.find("button[data-action='toggle-montaria-preset']").length) return;
+
+      const token = canvas.tokens.get(data._id);
+      if (!token) return;
+
+      const actorAssociatedPreset = token.actor
+        ? token.actor.getFlag("size-matters", "associatedPreset")
+        : null;
+
+      if (!actorAssociatedPreset) return;
+
+      // Check if the preset actually exists
+      const presets = game.settings.get("size-matters", "presets") || {};
+      if (!presets[actorAssociatedPreset]) {
+        // Clean up invalid preset association
+        if (token.actor) {
+          token.actor.unsetFlag("size-matters", "associatedPreset");
+        }
+        return;
+      }
+
+      const currentActivePreset = token.document.getFlag(
+        "size-matters",
+        "activePreset"
+      );
+      const isMontariaActive = currentActivePreset === actorAssociatedPreset;
+
+      const button = $(`
+        <button type="button" class="control-icon ${
+          isMontariaActive ? "active" : ""
+        }"
+                data-action="toggle-montaria-preset"
+                title="${
+                  isMontariaActive
+                    ? `Remover ${actorAssociatedPreset}`
+                    : `Adicionar ${actorAssociatedPreset}`
+                }">
+          <i class="${
+            isMontariaActive ? "fa-solid fa-person-walking" : "fa-solid fa-horse"
+          }"></i>
+        </button>
+      `);
+
+      $html.find(".col.left").append(button);
+      // Use event delegation for the button click to ensure it works after re-renders
+      $html.on("click", "button[data-action='toggle-montaria-preset']", async (event) => {
+        event.preventDefault(); // Prevent default button behavior
+        if (game.modules.get("size-matters").api.togglePresetOnToken) {
+          await game.modules.get("size-matters").api.togglePresetOnToken(actorAssociatedPreset);
+          // No need to force re-render the entire HUD here, as the togglePresetOnToken already handles it
+          // The HUD will naturally re-render if the token's flags change, which is handled by updateToken hook
+        } else {
+          ui.notifications.error(
+            "Função togglePresetOnToken não encontrada! Verifique se o seu módulo está carregado corretamente."
+          );
+        }
+      });
+    })
+  );
+}
 
 // ================================
 // UTILITIES (formerly utils.js)
@@ -50,12 +304,24 @@ export function checkFoundryReady() {
 // MAIN MODULE LOGIC
 // ================================
 
+/**
+ * Module-scoped instance of the Size Matters application
+ * @type {SizeMattersApp|null}
+ * @private
+ */
+let sizeMattersAppInstance = null;
+
+/**
+ * Opens the Size Matters configuration dialog
+ * @public
+ * @returns {void}
+ */
 function openSizeMatters() {
   if (!checkFoundryReady()) {
     return;
   }
-  if (window.sizeMattersApp && window.sizeMattersApp.rendered) {
-    window.sizeMattersApp.bringToTop();
+  if (sizeMattersAppInstance && sizeMattersAppInstance.rendered) {
+    sizeMattersAppInstance.bringToTop();
     return;
   }
   const token =
@@ -73,10 +339,15 @@ function openSizeMatters() {
       "This module works with hexagonal and square grids only!"
     );
   }
-  window.sizeMattersApp = new SizeMattersApp(token);
-  window.sizeMattersApp.render(true);
+  sizeMattersAppInstance = new SizeMattersApp(token);
+  sizeMattersAppInstance.render(true);
 }
 
+/**
+ * Opens the Ride Manager dialog for managing token formations
+ * @public
+ * @returns {void}
+ */
 function openRideManager() {
   if (!checkFoundryReady()) {
     return;
@@ -86,15 +357,26 @@ function openRideManager() {
   rideManager.render(true);
 }
 
+/**
+ * Opens the Preset Manager dialog for managing Size Matters presets
+ * @public
+ * @returns {void}
+ */
 function openPresetManager() {
   if (!checkFoundryReady()) {
     return;
   }
 
-  const presetManager = new PresetManagerApp(window.sizeMattersApp);
+  const presetManager = new PresetManagerApp(sizeMattersAppInstance);
   presetManager.render(true);
 }
 
+/**
+ * Toggles a preset on the selected token
+ * @public
+ * @param {string} presetName - The name of the preset to toggle
+ * @returns {Promise<void>}
+ */
 async function togglePresetOnToken(presetName) {
   if (!checkFoundryReady()) {
     return;
@@ -171,14 +453,14 @@ async function togglePresetOnToken(presetName) {
     }
 
     if (
-      window.sizeMattersApp &&
-      window.sizeMattersApp.rendered &&
-      window.sizeMattersApp.tokenId === token.id
+      sizeMattersAppInstance &&
+      sizeMattersAppInstance.rendered &&
+      sizeMattersAppInstance.tokenId === token.id
     ) {
-      window.sizeMattersApp.loadSettings();
+      sizeMattersAppInstance.loadSettings();
       // Don't force re-render if the window is already open for this token
       // Just refresh the settings without opening a new window
-      window.sizeMattersApp.render(false);
+      sizeMattersAppInstance.render(false);
     }
   } catch (error) {
     console.error("Size Matters: Error toggling preset on token:", error);
@@ -186,7 +468,21 @@ async function togglePresetOnToken(presetName) {
   }
 }
 
+/**
+ * Foundry VTT init hook - Registers settings and initializes the module
+ * @event
+ */
 Hooks.once("init", () => {
+  // Register enableDirectionalHighlight setting
+  game.settings.register("size-matters", "enableDirectionalHighlight", {
+    name: "Enable Directional Highlight",
+    hint: "Enable directional highlighting for hexagonal grids",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Grid size configuration settings
   game.settings.register("size-matters", "gridSizeConfig", {
     name: "Grid Size Configuration",
@@ -241,197 +537,15 @@ Hooks.once("init", () => {
     showRideManagementDialog,
     toggleQuickFollow,
   };
+
+  // Register all module hooks with cleanup
+  _registerAllModuleHooks();
 });
 
+/**
+ * Foundry VTT ready hook - Initializes module state after Foundry is fully loaded
+ * @event
+ */
 Hooks.once("ready", () => {
-  window.sizeMattersApp = null;
+  sizeMattersAppInstance = null;
 });
-
-
-Hooks.on("getSceneControlButtons", (controls) => {
-  const tokenControls = controls.tokens;
-
-  if (tokenControls && tokenControls.tools) {
-    tokenControls.tools["size-matters-config-button"] = {
-      name: "size-matters-config-button",
-      title: "Size Matters Config",
-      icon: "fas fa-hexagon",
-      button: true,
-      onClick: () => {
-        game.modules.get("size-matters").api.openSizeMatters();
-      },
-      visible: game.user.isGM,
-    };
-  }
-});
-
-Hooks.on("chatMessage", (chatLog, message, chatData) => {
-  if (message.trim() === "/size-matters") {
-    game.modules.get("size-matters").api.openSizeMatters();
-    return false;
-  }
-  if (message.trim() === "/ride") {
-    game.modules.get("size-matters").api.openRideManager();
-    return false;
-  }
-});
-
-Hooks.on("controlToken", (token, controlled) => {
-  if (window.sizeMattersApp && window.sizeMattersApp.rendered) {
-    if (controlled) {
-      window.sizeMattersApp.setControlledToken(token);
-    }
-  }
-});
-
-Hooks.on("releaseToken", (token, controlled) => {
-  if (
-    window.sizeMattersApp &&
-    window.sizeMattersApp.rendered &&
-    canvas.tokens.controlled.length === 0
-  ) {
-    window.sizeMattersApp.setControlledToken(null);
-  }
-});
-
-Hooks.on("canvasInit", () => {
-  clearAllSizeMattersGraphics();
-});
-
-Hooks.on("canvasReady", async () => {
-  setTimeout(async () => {
-    await game.modules.get("size-matters").api.restoreRidesFromFlags();
-
-    for (const token of canvas.tokens.placeables) {
-      const settings = token.document.getFlag("size-matters", "settings");
-      //      const activePreset = token.document.getFlag('size-matters', 'activePreset');
-
-      if (settings && settings.grid) {
-        await drawSizeMattersGraphicsForToken(token);
-      } else if (!settings) {
-        clearTokenSizeMattersGraphics(token);
-      }
-    }
-  }, 500);
-});
-
-Hooks.on("renderToken", async (token) => {
-  setTimeout(async () => {
-    const settings = token.document.getFlag("size-matters", "settings");
-    //    const activePreset = token.document.getFlag('size-matters', 'activePreset');
-
-    if (settings && settings.grid && !token.sizeMattersGrid) {
-      await drawSizeMattersGraphicsForToken(token);
-    } else if (!settings && token.sizeMattersGrid) {
-      clearTokenSizeMattersGraphics(token);
-    }
-  }, 100);
-});
-
-Hooks.on("preDeleteToken", (tokenDocument, options, userId) => {
-  const token = canvas.tokens.get(tokenDocument.id);
-  if (token) {
-    clearTokenSizeMattersGraphics(token);
-  }
-});
-
-Hooks.on("deleteToken", async (tokenDocument, options, userId) => {
-  // Remove the associatedPreset flag from the actor
-  const token = canvas.tokens.get(tokenDocument.id);
-  if (token && token.actor) {
-    try {
-      await token.actor.unsetFlag("size-matters", "associatedPreset");
-    } catch (error) {
-      // Silent fail for cleanup
-    }
-  }
-
-  game.modules.get("size-matters").api.stopTokenRide(tokenDocument, true);
-});
-
-Hooks.on("updateScene", (scene, changes) => {
-  if (changes.active === true) {
-    clearAllSizeMattersGraphics();
-  }
-});
-
-Hooks.on("updateToken", async (tokenDocument, changes, options, userId) => {
-  try {
-    if (changes.flags && changes.flags["size-matters"]) {
-      const token = canvas.tokens.get(tokenDocument.id);
-      if (!token) {
-        return;
-      }
-      setTimeout(async () => {
-        clearTokenSizeMattersGraphics(token);
-        await drawSizeMattersGraphicsForToken(token);
-      }, 50);
-    }
-  } catch (error) {
-    // Silent error handling
-  }
-});
-
-Hooks.on("renderTokenHUD", (app, html, data) => {
-  const $html = $(html);
-  if ($html.find("button[data-action='toggle-montaria-preset']").length) return;
-
-  const token = canvas.tokens.get(data._id);
-  if (!token) return;
-
-  const actorAssociatedPreset = token.actor
-    ? token.actor.getFlag("size-matters", "associatedPreset")
-    : null;
-
-  if (!actorAssociatedPreset) return;
-
-  // Check if the preset actually exists
-  const presets = game.settings.get("size-matters", "presets") || {};
-  if (!presets[actorAssociatedPreset]) {
-    // Clean up invalid preset association
-    if (token.actor) {
-      token.actor.unsetFlag("size-matters", "associatedPreset");
-    }
-    return;
-  }
-
-  const currentActivePreset = token.document.getFlag(
-    "size-matters",
-    "activePreset"
-  );
-  const isMontariaActive = currentActivePreset === actorAssociatedPreset;
-
-  const button = $(`
-    <button type="button" class="control-icon ${
-      isMontariaActive ? "active" : ""
-    }"
-            data-action="toggle-montaria-preset"
-            title="${
-              isMontariaActive
-                ? `Remover ${actorAssociatedPreset}`
-                : `Adicionar ${actorAssociatedPreset}`
-            }">
-      <i class="${
-        isMontariaActive ? "fa-solid fa-person-walking" : "fa-solid fa-horse"
-      }"></i>
-    </button>
-  `);
-
-  $html.find(".col.left").append(button);
-  button.on("click", async () => {
-    if (game.modules.get("size-matters").api.togglePresetOnToken) {
-      await game.modules.get("size-matters").api.togglePresetOnToken(actorAssociatedPreset);
-      // Force re-render of the HUD to update button state
-      setTimeout(() => {
-        if (token.hasActiveHUD) {
-          token.layer.hud.render(true);
-        }
-      }, 100);
-    } else {
-      ui.notifications.error(
-        "Função togglePresetOnToken não encontrada! Verifique se o seu módulo está carregado corretamente."
-      );
-    }
-  });
-});
-

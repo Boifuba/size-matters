@@ -29,6 +29,70 @@ export function squareToPixel(x, y, size) {
 }
 
 /**
+ * Converte coordenadas de pixel para coordenadas axiais para grades hexagonais.
+ * Esta é a função inversa de axialToPixel.
+ * @param {number} x - Coordenada X do pixel (relativa ao centro)
+ * @param {number} y - Coordenada Y do pixel (relativa ao centro)
+ * @param {number} radius - Raio do hexágono
+ * @param {boolean} pointy - Se o hexágono tem o topo pontudo
+ * @returns {Object} Coordenadas axiais {q, r}
+ */
+export function pixelToAxial(x, y, radius, pointy) {
+  if (pointy) {
+    // Pointy-top hexagon
+    const q = (Math.sqrt(3) / 3 * x - 1 / 3 * y) / radius;
+    const r = (2 / 3 * y) / radius;
+    return axialRound(q, r);
+  } else {
+    // Flat-top hexagon
+    const q = (2 / 3 * x) / radius;
+    const r = (-1 / 3 * x + Math.sqrt(3) / 3 * y) / radius;
+    return axialRound(q, r);
+  }
+}
+
+/**
+ * Converte coordenadas de pixel para coordenadas de grade quadrada.
+ * Esta é a função inversa de squareToPixel.
+ * @param {number} x - Coordenada X do pixel (relativa ao centro)
+ * @param {number} y - Coordenada Y do pixel (relativa ao centro)
+ * @param {number} size - Tamanho da célula da grade
+ * @returns {Object} Coordenadas de grade {x, y}
+ */
+export function pixelToSquare(x, y, size) {
+  return {
+    x: Math.round(x / size),
+    y: Math.round(y / size)
+  };
+}
+
+/**
+ * Arredonda coordenadas axiais para a célula hexagonal mais próxima.
+ * @param {number} q - Coordenada Q (axial)
+ * @param {number} r - Coordenada R (axial)
+ * @returns {Object} Coordenadas axiais arredondadas {q, r}
+ */
+function axialRound(q, r) {
+  const s = -q - r;
+  
+  let rq = Math.round(q);
+  let rr = Math.round(r);
+  let rs = Math.round(s);
+  
+  const qDiff = Math.abs(rq - q);
+  const rDiff = Math.abs(rr - r);
+  const sDiff = Math.abs(rs - s);
+  
+  if (qDiff > rDiff && qDiff > sDiff) {
+    rq = -rr - rs;
+  } else if (rDiff > sDiff) {
+    rr = -rq - rs;
+  }
+  
+  return { q: rq, r: rr };
+}
+
+/**
  * Retorna os 6 vértices de um hexágono.
  * @param {number} cx - Centro X
  * @param {number} cy - Centro Y

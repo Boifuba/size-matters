@@ -3,7 +3,8 @@
  * Utilitários de renderização de gráficos para tokens.
  */
 
-import { axialToPixel, squareToPixel, getHexVertices, getEdgeKey } from './grid-utils.js';
+import { axialToPixel, squareToPixel } from './grid-utils.js';
+import { calculateDirectionalColors } from './directional-utils.js';
 import { DIRECTIONAL_COLORS, DEFAULT_SETTINGS } from './constants.js';
 import { getTexture } from './texture-utils.js';
 
@@ -11,7 +12,12 @@ import { getTexture } from './texture-utils.js';
 // TOKEN GRAPHICS LOGIC
 // ================================
 
-// Função auxiliar para reconstruir o caminho do contorno
+/**
+ * Reconstrói o caminho do contorno a partir das arestas
+ * @param {Set} outlineEdgeKeys - Chaves das arestas do contorno
+ * @param {Array} allEdges - Todas as arestas
+ * @returns {Array} Pontos do caminho
+ */
 function getOutlinePath(outlineEdgeKeys, allEdges) {
     const outlineEdges = allEdges.filter(edge => outlineEdgeKeys.has(edge.key));
     if (outlineEdges.length === 0) return [];
@@ -49,10 +55,38 @@ function getOutlinePath(outlineEdgeKeys, allEdges) {
 }
 
 /**
+ * Configura um sprite para ser completamente não-interativo
+ * @param {PIXI.Sprite} sprite - O sprite a ser configurado
+ */
+function makeNonInteractive(sprite) {
+    sprite.interactive = false;
+    sprite.interactiveChildren = false;
+    sprite.buttonMode = false;
+    sprite.hitArea = null; // Remove hit area completamente
+    
+    // FORÇA pointer-events: none no DOM se existir
+    if (sprite.view && sprite.view.style) {
+        sprite.view.style.pointerEvents = 'none';
+        sprite.view.style.userSelect = 'none';
+    }
+    
+    // Força propriedades PIXI para garantir que não capture eventos
+    sprite.eventMode = 'none';
+    sprite.cursor = null;
+    sprite.pointerdown = null;
+    sprite.pointerup = null;
+    sprite.pointermove = null;
+    sprite.pointerover = null;
+    sprite.pointerout = null;
+    sprite.click = null;
+    sprite.tap = null;
+}
+
+/**
  * Desenha os gráficos do Size Matters para um token.
  * @param {Token} token - O token para o qual desenhar os gráficos.
  */
-export async function drawSizeMattersGraphicsForToken(token) {
+async function drawSizeMattersGraphicsForToken(token) {
   if (!token || !token.document) return;
 
   let settings = token.document.getFlag('size-matters', 'settings');
@@ -75,6 +109,14 @@ export async function drawSizeMattersGraphicsForToken(token) {
   clearTokenSizeMattersGraphics(token);
 
   token.sizeMattersContainer = new PIXI.Container();
+  // Fazer o container também não-interativo para garantir que cliques passem através
+  makeNonInteractive(token.sizeMattersContainer);
+  
+  // FORÇA o container a não capturar eventos
+  token.sizeMattersContainer.interactive = false;
+  token.sizeMattersContainer.interactiveChildren = false;
+  token.sizeMattersContainer.eventMode = 'none';
+  
   canvas.primary.addChild(token.sizeMattersContainer);
 
   // Load effect image if available
@@ -84,6 +126,22 @@ export async function drawSizeMattersGraphicsForToken(token) {
       if (texture) {
         token.sizeMattersImage = new PIXI.Sprite(texture);
         token.sizeMattersImage.anchor.set(0.5, 0.5);
+        
+        // CRÍTICO: Fazer a imagem do efeito completamente não-interativa
+        makeNonInteractive(token.sizeMattersImage);
+        
+        // FORÇA propriedades adicionais para garantir que não capture cliques
+        token.sizeMattersImage.interactive = false;
+        token.sizeMattersImage.interactiveChildren = false;
+        token.sizeMattersImage.eventMode = 'none';
+        token.sizeMattersImage.hitArea = null;
+        token.sizeMattersImage.buttonMode = false;
+        
+        // Se tiver referência ao DOM, aplica pointer-events: none
+        if (token.sizeMattersImage.view) {
+          token.sizeMattersImage.view.style.pointerEvents = 'none';
+          token.sizeMattersImage.view.style.userSelect = 'none';
+        }
       }
     } catch (error) {
       console.warn("Size Matters: Falha ao carregar imagem para o token", token.id, error);
@@ -97,6 +155,22 @@ export async function drawSizeMattersGraphicsForToken(token) {
       if (tokenTexture) {
         token.sizeMattersTokenImage = new PIXI.Sprite(tokenTexture);
         token.sizeMattersTokenImage.anchor.set(0.5, 0.5);
+        
+        // CRÍTICO: Fazer a imagem do token completamente não-interativa
+        makeNonInteractive(token.sizeMattersTokenImage);
+        
+        // FORÇA propriedades adicionais para garantir que não capture cliques
+        token.sizeMattersTokenImage.interactive = false;
+        token.sizeMattersTokenImage.interactiveChildren = false;
+        token.sizeMattersTokenImage.eventMode = 'none';
+        token.sizeMattersTokenImage.hitArea = null;
+        token.sizeMattersTokenImage.buttonMode = false;
+        
+        // Se tiver referência ao DOM, aplica pointer-events: none
+        if (token.sizeMattersTokenImage.view) {
+          token.sizeMattersTokenImage.view.style.pointerEvents = 'none';
+          token.sizeMattersTokenImage.view.style.userSelect = 'none';
+        }
         
         // Calculate token image size based on grid type and token size
         const gridType = canvas.grid.type;
@@ -145,6 +219,16 @@ export async function drawSizeMattersGraphicsForToken(token) {
     
     // Passe o gridDataForDrawing (modificado se necessário) para createGridGraphics
     token.sizeMattersGrid = createGridGraphics(settings, gridDataForDrawing, hexRadius, size);
+    
+    // CRÍTICO: Fazer o grid também não-interativo para garantir consistência
+    makeNonInteractive(token.sizeMattersGrid);
+    
+    // FORÇA propriedades adicionais no grid
+    token.sizeMattersGrid.interactive = false;
+    token.sizeMattersGrid.interactiveChildren = false;
+    token.sizeMattersGrid.eventMode = 'none';
+    token.sizeMattersGrid.hitArea = null;
+    
     token.sizeMattersContainer.addChild(token.sizeMattersGrid);
   }
 
@@ -167,62 +251,6 @@ export async function drawSizeMattersGraphicsForToken(token) {
   }
 }
 
-/**
- * Encontra arestas conectadas a uma aresta específica
- * @param {Number} targetIndex - Índice da aresta alvo
- * @param {Array} edges - Array de arestas
- * @returns {Array} Índices das arestas conectadas
- */
-function findConnectedEdges(targetIndex, edges) {
-  const targetEdge = edges[targetIndex];
-  const connected = [];
-  const VERTEX_TOLERANCE = 0.5; // Aumentar tolerância
-  
-  for (let i = 0; i < edges.length; i++) {
-    if (i === targetIndex) continue;
-    
-    const edge = edges[i];
-    
-    // Verifica se compartilha um vértice com tolerância maior
-    const sharesVertex = (
-      (Math.abs(edge.p1.x - targetEdge.p1.x) < VERTEX_TOLERANCE && Math.abs(edge.p1.y - targetEdge.p1.y) < VERTEX_TOLERANCE) ||
-      (Math.abs(edge.p1.x - targetEdge.p2.x) < VERTEX_TOLERANCE && Math.abs(edge.p1.y - targetEdge.p2.y) < VERTEX_TOLERANCE) ||
-      (Math.abs(edge.p2.x - targetEdge.p1.x) < VERTEX_TOLERANCE && Math.abs(edge.p2.y - targetEdge.p1.y) < VERTEX_TOLERANCE) ||
-      (Math.abs(edge.p2.x - targetEdge.p2.x) < VERTEX_TOLERANCE && Math.abs(edge.p2.y - targetEdge.p2.y) < VERTEX_TOLERANCE)
-    );
-    
-    if (sharesVertex) {
-      connected.push(i);
-    }
-  }
-  
-  return connected;
-}
-
-/**
- * Calcula a largura do grid contando as colunas (q) únicas.
- * @param {Array} selectedCells - Array de células de hexágono selecionadas.
- * @returns {Number} Largura do grid em unidades de hexágono.
- */
-function getGridWidth(selectedCells) {
-    if (!selectedCells || selectedCells.length === 0) return 0;
-    const qCoordinates = selectedCells.map(cell => cell.q);
-    const uniqueQ = new Set(qCoordinates);
-    return uniqueQ.size;
-}
-
-/**
- * Calcula a altura do grid contando as linhas (r) únicas.
- * @param {Array} selectedCells - Array de células de hexágono selecionadas.
- * @returns {Number} Altura do grid em unidades de hexágono.
- */
-function getGridHeight(selectedCells) {
-    if (!selectedCells || selectedCells.length === 0) return 0;
-    const rCoordinates = selectedCells.map(cell => cell.r);
-    const uniqueR = new Set(rCoordinates);
-    return uniqueR.size;
-}
-
 export function createGridGraphics(settings, gridData, hexRadius = null, gridSize = null) {
   const graphics = new PIXI.Graphics();
   const selectedCells = Object.values(gridData).filter(h => h.selected);
@@ -238,301 +266,52 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
   const size      = gridSize || canvas.grid.size;
 
   const enableDirectionalHighlight = settings.enableDirectionalHighlight;
-  const { RED, GREEN, YELLOW: YELL } = DIRECTIONAL_COLORS;
 
   if (isHexGrid) {
     const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
     const actualHexRadius = hexRadius || (size / Math.sqrt(3));
-    const edgeCounts  = new Map();
-    const edgesRaw    = [];
 
-    for (const cell of selectedCells) {
-      const offset  = axialToPixel(cell.q, cell.r, actualHexRadius, isPointyTop);
-      const verts   = getHexVertices(offset.x, offset.y, actualHexRadius, isPointyTop);
-      for (let i = 0; i < 6; i++) {
-        const p1 = verts[i];
-        const p2 = verts[(i + 1) % 6];
-        const key = getEdgeKey(p1, p2);
-        edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
-        edgesRaw.push({ key, p1, p2, edgeIndex: i });
-      }
+    // Use the new directional colors utility
+    const result = calculateDirectionalColors(selectedCells, actualHexRadius, isPointyTop, settings);
+    
+    if (result.edges.length === 0) return graphics;
+
+    // Create path from edges for fill
+    const path = [];
+    if (result.edges.length > 0) {
+      // Build path from first and last points of edges
+      result.edges.forEach((edge, index) => {
+        if (index === 0) {
+          path.push(edge.p1.x, edge.p1.y);
+        }
+        path.push(edge.p2.x, edge.p2.y);
+      });
     }
 
-    const outlineEdges = edgesRaw.filter(e => edgeCounts.get(e.key) === 1);
-    if (outlineEdges.length === 0) return graphics;
-
-    // Regra especial para hexágono único
-    if (enableDirectionalHighlight && selectedCells.length === 1 && !isPointyTop) {
-        if (settings.enableFill) {
-            const path = getOutlinePath(new Set(outlineEdges.map(e => e.key)), edgesRaw);
-            graphics.beginFill(fillColor, effectiveAlpha);
-            graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
-            graphics.endFill();
-        }
-        if (settings.enableContour) {
-            for (const edge of outlineEdges) {
-                let edgeColor;
-                switch (edge.edgeIndex) {
-                    case 4: edgeColor = RED; break;
-                    case 0: case 1: case 2: edgeColor = GREEN; break;
-                    case 3: case 5: edgeColor = YELL; break;
-                    default: edgeColor = color;
-                }
-                graphics.lineStyle(settings.thickness, edgeColor, effectiveAlpha);
-                graphics.moveTo(edge.p1.x, edge.p1.y);
-                graphics.lineTo(edge.p2.x, edge.p2.y);
-            }
-        }
-        return graphics;
-    }
-
-    const path = getOutlinePath(new Set(outlineEdges.map(e => e.key)), edgesRaw);
-    if (path.length < 2) return graphics;
-
-    if (settings.enableFill) {
+    // Draw fill if enabled
+    if (settings.enableFill && path.length > 4) {
       graphics.beginFill(fillColor, effectiveAlpha);
-      graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
+      graphics.drawPolygon(path);
       graphics.endFill();
     }
 
-    if (!settings.enableContour) return graphics;
-
-    if (enableDirectionalHighlight) {
-      const gridWidth = getGridWidth(selectedCells);
-      const gridHeight = getGridHeight(selectedCells);
-      
-      const edges = [];
-      for (let i = 0; i < path.length - 1; i++) edges.push({ p1: path[i], p2: path[i + 1] });
-      const first = path[0], last = path[path.length - 1];
-      if (Math.abs(first.x - last.x) > 0.1 || Math.abs(first.y - last.y) > 0.1) {
-        edges.push({ p1: last, p2: first });
-      }
-
-      let minY = Infinity, maxY = -Infinity;
-      for (const e of edges) {
-        minY = Math.min(minY, e.p1.y, e.p2.y);
-        maxY = Math.max(maxY, e.p1.y, e.p2.y);
-      }
-
-      const ANG_TOL = 0.15;
-      const Y_TOL   = Math.max(3.0, size * 0.1);
-
-      const typed = edges.map(e => {
-        const vx = e.p2.x - e.p1.x, vy = e.p2.y - e.p1.y;
-        const len = Math.hypot(vx, vy) || 1;
-        const isHorizontal = Math.abs(vy / len) < ANG_TOL;
-        const yMid = (e.p1.y + e.p2.y) / 2;
-        const isNorthTop = isHorizontal && Math.abs(yMid - minY) <= Y_TOL;
-        const isSouthBot = isHorizontal && Math.abs(yMid - maxY) <= Y_TOL;
-        return { ...e, isHorizontal, isNorthTop, isSouthBot };
-      });
-
-      const N = typed.length;
-      const col = new Array(N).fill(YELL);
-
-      // PASSO 1: Aplicar regras básicas (limitadas)
-      
-      // VERMELHO - expansão básica limitada
-      const northEdges = [];
-      for (let i = 0; i < N; i++) {
-        if (typed[i].isNorthTop) {
-          col[i] = RED;
-          northEdges.push(i);
+    // Draw contours if enabled
+    if (settings.enableContour) {
+      if (enableDirectionalHighlight && result.colors) {
+        // Draw directional colored edges
+        result.edges.forEach((edge, index) => {
+          const edgeColor = result.colors[index];
+          graphics.lineStyle(settings.thickness, edgeColor, effectiveAlpha);
+          graphics.moveTo(edge.p1.x, edge.p1.y);
+          graphics.lineTo(edge.p2.x, edge.p2.y);
+        });
+      } else {
+        // Draw normal outline
+        graphics.lineStyle(settings.thickness, color, effectiveAlpha);
+        if (path.length > 4) {
+          graphics.drawPolygon(path);
         }
       }
-      
-      
-      if (northEdges.length > 0) {
-        // Expansão básica limitada do vermelho
-        const baseRedExpansion = Math.max(1, gridWidth - 1);
-        
-        let currentRedEdges = [...northEdges];
-        let allRedEdges = [...northEdges];
-        
-        for (let layer = 0; layer < baseRedExpansion; layer++) {
-          if (currentRedEdges.length === 0) break;
-          
-          const nextLayerEdges = [];
-          for (const redIndex of currentRedEdges) {
-            const connected = findConnectedEdges(redIndex, typed);
-            for (const index of connected) {
-              if (col[index] === YELL && !allRedEdges.includes(index)) {
-                col[index] = RED;
-                nextLayerEdges.push(index);
-                allRedEdges.push(index);
-              }
-            }
-          }
-          currentRedEdges = [...new Set(nextLayerEdges)];
-        }
-      }
-
-      // VERDE - expansão básica limitada
-      let currentGreenEdges = [];
-      for (let i = 0; i < N; i++) {
-        if (typed[i].isSouthBot && col[i] !== RED) {
-          col[i] = GREEN;
-          currentGreenEdges.push(i);
-        }
-      }
-      
-
-      let allGreenEdges = [...currentGreenEdges];
-      
-      const baseGreenExpansion = Math.max(1, gridHeight - 1);
-
-      for (let layer = 0; layer < baseGreenExpansion; layer++) {
-        if (currentGreenEdges.length === 0) break;
-        
-        const nextLayerEdges = [];
-        for (const greenIndex of currentGreenEdges) {
-          const connected = findConnectedEdges(greenIndex, typed);
-          for (const index of connected) {
-            if (col[index] === YELL && !allGreenEdges.includes(index)) {
-              col[index] = GREEN;
-              nextLayerEdges.push(index);
-              allGreenEdges.push(index);
-            }
-          }
-        }
-        currentGreenEdges = [...new Set(nextLayerEdges)];
-      }
-
-      // PASSO 2: Aplicar ajustes manuais ILIMITADOS
-      
-      // Ajuste manual do VERMELHO (pode ser positivo ou negativo)
-      const redAdjustment = settings.redLineAdjustment || 0;
-      
-      if (redAdjustment > 0) {
-        // Adicionar mais camadas vermelhas - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
-        let currentRedEdges = [];
-        for (let i = 0; i < N; i++) {
-          if (col[i] === RED) currentRedEdges.push(i);
-        }
-        
-        for (let layer = 0; layer < redAdjustment; layer++) {
-          const nextLayerEdges = [];
-          
-          // EXPANSÃO AGRESSIVA: Converte QUALQUER edge adjacente que não seja vermelha
-          for (const redIndex of currentRedEdges) {
-            const connected = findConnectedEdges(redIndex, typed);
-            for (const index of connected) {
-              if (col[index] !== RED && !nextLayerEdges.includes(index)) {
-                nextLayerEdges.push(index);
-              }
-            }
-          }
-          
-          // Aplicar as mudanças
-          for (const idx of nextLayerEdges) {
-            col[idx] = RED;
-          }
-          
-          currentRedEdges = [...nextLayerEdges];
-          
-          // Se não conseguiu expandir nada, para
-          if (nextLayerEdges.length === 0) {
-            break;
-          }
-        }
-      } else if (redAdjustment < 0) {
-        // Remover camadas vermelhas (convertendo para amarelo)
-        const layersToRemove = Math.abs(redAdjustment);
-        for (let layer = 0; layer < layersToRemove; layer++) {
-          const edgesToRemove = [];
-          
-          // Encontrar edges vermelhas que estão na borda (conectadas a não-vermelhas)
-          for (let i = 0; i < N; i++) {
-            if (col[i] === RED) {
-              const connected = findConnectedEdges(i, typed);
-              const hasNonRedNeighbor = connected.some(idx => col[idx] !== RED);
-              if (hasNonRedNeighbor) {
-                edgesToRemove.push(i);
-              }
-            }
-          }
-          
-          // Converter para amarelo
-          for (const idx of edgesToRemove) {
-            col[idx] = YELL;
-          }
-          
-          
-          if (edgesToRemove.length === 0) break; // Não há mais edges para remover
-        }
-      }
-      
-      // Ajuste manual do VERDE (pode ser positivo ou negativo)
-      const greenAdjustment = settings.greenLineAdjustment || 0;
-      
-      if (greenAdjustment > 0) {
-        // Adicionar mais camadas verdes - EXPANSÃO AGRESSIVA (IGNORA REGRAS AUTOMÁTICAS)
-        let currentGreenEdges = [];
-        for (let i = 0; i < N; i++) {
-          if (col[i] === GREEN) currentGreenEdges.push(i);
-        }
-        
-        for (let layer = 0; layer < greenAdjustment; layer++) {
-          const nextLayerEdges = [];
-          
-          // EXPANSÃO AGRESSIVA: Converte QUALQUER edge adjacente que não seja verde
-          for (const greenIndex of currentGreenEdges) {
-            const connected = findConnectedEdges(greenIndex, typed);
-            for (const index of connected) {
-              if (col[index] !== GREEN && !nextLayerEdges.includes(index)) {
-                nextLayerEdges.push(index);
-              }
-            }
-          }
-          
-          // Aplicar as mudanças
-          for (const idx of nextLayerEdges) {
-            col[idx] = GREEN;
-          }
-          
-          currentGreenEdges = [...nextLayerEdges];
-          
-          // Se não conseguiu expandir nada, para
-          if (nextLayerEdges.length === 0) {
-            break;
-          }
-        }
-      } else if (greenAdjustment < 0) {
-        // Remover camadas verdes (convertendo para amarelo)
-        const layersToRemove = Math.abs(greenAdjustment);
-        for (let layer = 0; layer < layersToRemove; layer++) {
-          const edgesToRemove = [];
-          
-          // Encontrar edges verdes que estão na borda (conectadas a não-verdes)
-          for (let i = 0; i < N; i++) {
-            if (col[i] === GREEN) {
-              const connected = findConnectedEdges(i, typed);
-              const hasNonGreenNeighbor = connected.some(idx => col[idx] !== GREEN);
-              if (hasNonGreenNeighbor) {
-                edgesToRemove.push(i);
-              }
-            }
-          }
-          
-          // Converter para amarelo
-          for (const idx of edgesToRemove) {
-            col[idx] = YELL;
-          }
-          
-          
-          if (edgesToRemove.length === 0) break; // Não há mais edges para remover
-        }
-      }
-      
-      // Desenho do contorno colorido
-      for (let i = 0; i < N; i++) {
-        graphics.lineStyle(settings.thickness, col[i], effectiveAlpha);
-        graphics.moveTo(typed[i].p1.x, typed[i].p1.y);
-        graphics.lineTo(typed[i].p2.x, typed[i].p2.y);
-      }
-    } else {
-      graphics.lineStyle(settings.thickness, color, effectiveAlpha);
-      graphics.drawPolygon(path.flatMap(p => [p.x, p.y]));
     }
   } else {
     // Quadrados (inalterado)
@@ -569,10 +348,20 @@ export function setupTicker(token, settings) {
     container.rotation = tokenRotation;
     
     container.visible = token.visible && ((settings.gridVisible !== false) || (settings.imageVisible !== false));
+    
+    // REFORÇA que o container não deve capturar eventos
+    container.interactive = false;
+    container.interactiveChildren = false;
+    container.eventMode = 'none';
 
     if (token.sizeMattersGrid) {
       token.sizeMattersGrid.visible = (settings.gridVisible !== false);
       token.sizeMattersGrid.position.set(0, 0);
+      
+      // REFORÇA que o grid não deve capturar eventos
+      token.sizeMattersGrid.interactive = false;
+      token.sizeMattersGrid.interactiveChildren = false;
+      token.sizeMattersGrid.eventMode = 'none';
     }
 
     if (token.sizeMattersImage) {
@@ -584,6 +373,12 @@ export function setupTicker(token, settings) {
       token.sizeMattersImage.position.set(offsetX, offsetY);
       
       token.sizeMattersImage.rotation = Math.toRadians(settings.imageRotation || 0);
+      
+      // REFORÇA que a imagem não deve capturar eventos
+      token.sizeMattersImage.interactive = false;
+      token.sizeMattersImage.interactiveChildren = false;
+      token.sizeMattersImage.eventMode = 'none';
+      token.sizeMattersImage.hitArea = null;
     }
 
     if (token.sizeMattersTokenImage) {
@@ -591,8 +386,11 @@ export function setupTicker(token, settings) {
       token.sizeMattersTokenImage.visible = true;
       token.sizeMattersTokenImage.position.set(0, 0); // Centered in container
       
-      // Token image doesn't rotate with the container - it maintains its own rotation
-      token.sizeMattersTokenImage.rotation = 0;
+      // REFORÇA que a imagem do token não deve capturar eventos
+      token.sizeMattersTokenImage.interactive = false;
+      token.sizeMattersTokenImage.interactiveChildren = false;
+      token.sizeMattersTokenImage.eventMode = 'none';
+      token.sizeMattersTokenImage.hitArea = null;
     }
   };
 
@@ -600,7 +398,7 @@ export function setupTicker(token, settings) {
   canvas.app.ticker.add(token.sizeMattersGridTicker);
 }
 
-export function clearTokenSizeMattersGraphics(token) {
+function clearTokenSizeMattersGraphics(token) {
   if (!token) return;
 
   if (token.sizeMattersContainer) {
@@ -616,39 +414,17 @@ export function clearTokenSizeMattersGraphics(token) {
   token.sizeMattersContainer = null;
 
   if (token.sizeMattersGrid) {
-    try {
-      if (token.sizeMattersGrid.parent) {
-        token.sizeMattersGrid.parent.removeChild(token.sizeMattersGrid);
-      }
-      token.sizeMattersGrid.clear();
-      token.sizeMattersGrid.destroy(true);
-    } catch (error) {
-      console.warn("Size Matters: Erro ao destruir gráficos da grade", error);
-    }
+    // Grid is already destroyed as a child of sizeMattersContainer
   }
   token.sizeMattersGrid = null;
 
   if (token.sizeMattersImage) {
-    try {
-      if (token.sizeMattersImage.parent) {
-        token.sizeMattersImage.parent.removeChild(token.sizeMattersImage);
-      }
-      token.sizeMattersImage.destroy(false);
-    } catch (error) {
-      console.warn("Size Matters: Erro ao destruir sprite da imagem", error);
-    }
+    // Image is already destroyed as a child of sizeMattersContainer
   }
   token.sizeMattersImage = null;
 
   if (token.sizeMattersTokenImage) {
-    try {
-      if (token.sizeMattersTokenImage.parent) {
-        token.sizeMattersTokenImage.parent.removeChild(token.sizeMattersTokenImage);
-      }
-      token.sizeMattersTokenImage.destroy(false);
-    } catch (error) {
-      console.warn("Size Matters: Erro ao destruir sprite da imagem do token", error);
-    }
+    // Token image is already destroyed as a child of sizeMattersContainer
   }
   token.sizeMattersTokenImage = null;
 
@@ -662,7 +438,7 @@ export function clearTokenSizeMattersGraphics(token) {
   token.sizeMattersGridTicker = null;
 }
 
-export function clearAllSizeMattersGraphics() {
+function clearAllSizeMattersGraphics() {
   if (!canvas || !canvas.tokens) return;
 
   for (const token of canvas.tokens.placeables) {
@@ -684,3 +460,5 @@ export function clearAllSizeMattersGraphics() {
     toRemove.forEach(fn => canvas.app.ticker.remove(fn));
   }
 }
+
+export { drawSizeMattersGraphicsForToken, clearTokenSizeMattersGraphics, clearAllSizeMattersGraphics }

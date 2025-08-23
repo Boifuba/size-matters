@@ -4,7 +4,29 @@
  */
 
 import { axialToPixel, squareToPixel } from './grid-utils.js';
-import { DEFAULT_GRID_SIZE_CONFIG } from './constants.js';
+import { getTexture } from './texture-utils.js';
+import { calculateDirectionalColors } from './directional-utils.js';
+import { 
+  DEFAULT_GRID_SIZE_CONFIG,
+  DEFAULT_SVG_RADIUS,
+  DEFAULT_SQUARE_SIZE,
+  SVG_VIEWPORT_SIZE,
+  GRID_UNSELECTED_FILL_COLOR,
+  GRID_UNSELECTED_FILL_ALPHA,
+  GRID_STROKE_COLOR,
+  GRID_STROKE_WIDTH,
+  EFFECT_IMAGE_DEFAULT_OPACITY,
+  IMAGE_OFFSET_SCALE_FACTOR,
+  TOKEN_HEX_IMAGE_SCALE_FACTOR,
+  TOKEN_SQUARE_IMAGE_SCALE_FACTOR,
+  EFFECT_IMAGE_PREVIEW_BASE_SCALE,
+  TOKEN_IMAGE_Z_INDEX_STYLE
+} from './constants.js';
+
+// Z-Index Definitions for layering order
+export const TOKEN_IMAGE_Z_INDEX = 20;
+export const EFFECT_IMAGE_Z_INDEX = 10;
+export const GRID_GRAPHICS_Z_INDEX = 0;
 
 /**
  * Obtém a configuração de zoom atual das configurações do jogo
@@ -39,8 +61,8 @@ function getZoomConfig() {
 export class GridManager {
   constructor() {
     this.grid = {};
-    this.currentSvgRadius = 16;
-    this.currentSquareSize = 25;
+    this.currentSvgRadius = DEFAULT_SVG_RADIUS;
+    this.currentSquareSize = DEFAULT_SQUARE_SIZE;
     this.currentZoomLevel = 'medium';
   }
 
@@ -134,204 +156,296 @@ export class GridManager {
   }
 
   /**
-   * Cria SVG do grid
-   * @param {boolean} isHexGrid - Se é grid hexagonal
-   * @param {boolean} isPointyTop - Se hexágono tem topo pontudo
-   * @param {number} svgSize - Tamanho do SVG
-   * @param {Token} token - Token para calcular dimensões da imagem
-   * @param {Object} settings - Configurações incluindo imagem
-   * @returns {string} SVG como string
+   * Configura um sprite para ser completamente não-interativo e garantir que cliques passem através
+   * @param {PIXI.Sprite} sprite - O sprite a ser configurado
    */
-  createGridSVG(isHexGrid, isPointyTop, svgSize = 300, token = null, settings = null) {
-    return isHexGrid ? this.createHexSVG(isPointyTop, svgSize, token, settings) : this.createSquareSVG(svgSize, token, settings);
+  makeCompletelyNonInteractive(sprite) {
+    sprite.interactive = false;
+    sprite.interactiveChildren = false;
+    sprite.buttonMode = false;
+    sprite.hitArea = null;
+    sprite.eventMode = 'none';
+    
+    // Adicionais para garantir que eventos passem através
+    sprite.pointerEvents = 'none';
+    sprite.cursor = 'default';
+    
+    // Força o sprite a não capturar qualquer tipo de evento
+    if (sprite.on) {
+      sprite.removeAllListeners();
+    }
   }
 
   /**
-   * Cria SVG hexagonal
-   * @param {boolean} isPointyTop - Se hexágono tem topo pontudo
-   * @param {number} svgSize - Tamanho do SVG
+   * Draws the grid preview using PIXI.Graphics
+   * @param {PIXI.Graphics} graphics - The PIXI Graphics object to draw on
    * @param {Token} token - Token para calcular dimensões da imagem
    * @param {Object} settings - Configurações incluindo imagem
-   * @returns {string} SVG hexagonal
    */
-  createHexSVG(isPointyTop, svgSize = 300, token = null, settings = null) {
-    let svg = `<svg width="${svgSize}" height="${svgSize}" viewBox="0 0 ${svgSize} ${svgSize}">`;
+  async drawGridPreview(graphics, token = null, settings = null) {
+    if (!graphics) return;
+
+    // Clear previous graphics
+    graphics.clear();
+
+    const gridType = canvas?.grid?.type || CONST.GRID_TYPES.SQUARE;
+    const isHexGrid = [
+      CONST.GRID_TYPES.HEXODDR,
+      CONST.GRID_TYPES.HEXEVENR,
+      CONST.GRID_TYPES.HEXODDQ,
+      CONST.GRID_TYPES.HEXEVENQ,
+    ].includes(gridType);
+    const isPointyTop = [
+      CONST.GRID_TYPES.HEXODDR,
+      CONST.GRID_TYPES.HEXEVENR,
+    ].includes(gridType);
+
+    const canvasSize = 350; // Canvas size
+    const centerX = canvasSize / 2;
+    const centerY = canvasSize / 2;
+
+    // PRIMEIRO: Adicionar imagens ANTES de desenhar o grid
+    await this.addPreviewImages(graphics, centerX, centerY, token, settings);
+
+    // DEPOIS: Desenhar o grid POR CIMA das imagens
+    if (isHexGrid) {
+      await this.drawHexGridPreview(graphics, centerX, centerY, isPointyTop, token, settings);
+    } else {
+      await this.drawSquareGridPreview(graphics, centerX, centerY, token, settings);
+    }
+  }
+
+  /**
+   * Draws hexagonal grid preview
+   * @param {PIXI.Graphics} graphics - The PIXI Graphics object
+   * @param {number} centerX - Center X position
+   * @param {number} centerY - Center Y position
+   * @param {boolean} isPointyTop - Se hexágono tem topo pontudo
+   * @param {Token} token - Token para calcular dimensões da imagem
+   * @param {Object} settings - Configurações incluindo imagem
+   */
+  async drawHexGridPreview(graphics, centerX, centerY, isPointyTop, token = null, settings = null) {
+    const selectedCells = Object.values(this.grid).filter(cell => cell.selected);
     
-    // Primeiro, renderizar todas as células do grid
+    // Draw all grid cells first
     Object.entries(this.grid).forEach(([key, h]) => {
       const pos = axialToPixel(h.q, h.r, this.currentSvgRadius, isPointyTop);
-      const cx = svgSize / 2 + pos.x;
-      const cy = svgSize / 2 + pos.y;
-      let pts = [];
+      const cx = centerX + pos.x;
+      const cy = centerY + pos.y;
+      
+      const points = [];
       for (let i = 0; i < 6; i++) {
         const angle = isPointyTop ? (i * Math.PI / 3) - Math.PI / 2 : i * Math.PI / 3;
         const x = cx + this.currentSvgRadius * Math.cos(angle);
         const y = cy + this.currentSvgRadius * Math.sin(angle);
-        pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+        points.push(x, y);
       }
       
-      // Se a célula está selecionada, usar cor transparente para mostrar a imagem do token por baixo
-      // Se não está selecionada, usar cor branca normal
-      const fill = h.selected ? (settings && settings.fillColor ? settings.fillColor : '#ff0000') : 'rgba(255,255,255,0.1)';
-      const stroke = '#666';
-      const cssClass = 'grid-selectable';
-      svg += `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${stroke}" 
-              stroke-width="1" data-grid="${key}" 
-              class="${cssClass}" />`;
+      // Set fill color based on selection
+      if (h.selected) {
+        const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
+        graphics.beginFill(fillColor, 0.3);
+      } else {
+        graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
+      }
+      
+      graphics.lineStyle(GRID_STROKE_WIDTH, GRID_STROKE_COLOR);
+      graphics.drawPolygon(points);
+      graphics.endFill();
     });
-    
-    // Add effect image if available (behind everything)
-    if (token && settings && settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible) {
-      svg += this.createImageSVG(svgSize, token, settings);
+
+    // Draw directional colors if enabled and there are selected cells
+    if (settings?.enableDirectionalHighlight && selectedCells.length > 0) {
+      // Create grid data for drawing (similar to token-graphics.js)
+      let gridDataForDrawing = this.grid;
+      let selectedCellsForDrawing = selectedCells;
+
+      // Special case for empty selection with directional highlight
+      if (selectedCellsForDrawing.length === 0) {
+        gridDataForDrawing = {
+          "0,0": { q: 0, r: 0, selected: true, isCenter: true }
+        };
+        selectedCellsForDrawing = Object.values(gridDataForDrawing);
+      }
+
+      const result = calculateDirectionalColors(
+        selectedCellsForDrawing, 
+        this.currentSvgRadius, 
+        isPointyTop, 
+        settings
+      );
+
+      if (result.edges && result.colors) {
+        // Draw directional colored edges
+        result.edges.forEach((edge, index) => {
+          const color = result.colors[index];
+          graphics.lineStyle(settings.thickness || 3, color, 1.0);
+          graphics.moveTo(centerX + edge.p1.x, centerY + edge.p1.y);
+          graphics.lineTo(centerX + edge.p2.x, centerY + edge.p2.y);
+        });
+      }
+    } else if (settings?.enableContour && selectedCells.length > 0) {
+      // Draw normal outline without directional colors
+      const outlineColor = settings?.color ? parseInt(settings.color.replace('#', '0x')) : 0xff0000;
+      graphics.lineStyle(settings.thickness || 3, outlineColor, 1.0);
+      
+      // Simple outline for preview (could be enhanced with the same path logic)
+      selectedCells.forEach(cell => {
+        const pos = axialToPixel(cell.q, cell.r, this.currentSvgRadius, isPointyTop);
+        const cx = centerX + pos.x;
+        const cy = centerY + pos.y;
+        
+        const points = [];
+        for (let i = 0; i < 6; i++) {
+          const angle = isPointyTop ? (i * Math.PI / 3) - Math.PI / 2 : i * Math.PI / 3;
+          const x = cx + this.currentSvgRadius * Math.cos(angle);
+          const y = cy + this.currentSvgRadius * Math.sin(angle);
+          points.push(x, y);
+        }
+        
+        graphics.drawPolygon(points);
+      });
     }
-    
-    // Add token image on top (highest layer)
-    if (token && token.document && token.document.texture && token.document.texture.src) {
-      svg += this.createTokenImageSVG(svgSize, token);
-    }
-    
-    svg += `</svg>`;
-    return svg;
   }
 
   /**
-   * Cria SVG quadrado
-   * @param {number} svgSize - Tamanho do SVG
+   * Draws square grid preview
+   * @param {PIXI.Graphics} graphics - The PIXI Graphics object
+   * @param {number} centerX - Center X position
+   * @param {number} centerY - Center Y position
    * @param {Token} token - Token para calcular dimensões da imagem
    * @param {Object} settings - Configurações incluindo imagem
-   * @returns {string} SVG quadrado
    */
-  createSquareSVG(svgSize = 300, token = null, settings = null) {
-    let svg = `<svg width="${svgSize}" height="${svgSize}" viewBox="0 0 ${svgSize} ${svgSize}">`;
-    
-    // Primeiro, renderizar todas as células do grid
+  async drawSquareGridPreview(graphics, centerX, centerY, token = null, settings = null) {
+    // Draw all grid cells
     Object.entries(this.grid).forEach(([key, square]) => {
       const pos = squareToPixel(square.q, square.r, this.currentSquareSize);
-      const cx = svgSize / 2 + pos.x - this.currentSquareSize / 2;
-      const cy = svgSize / 2 + pos.y - this.currentSquareSize / 2;
+      const x = centerX + pos.x - this.currentSquareSize / 2;
+      const y = centerY + pos.y - this.currentSquareSize / 2;
 
-      // Se a célula está selecionada, usar cor transparente para mostrar a imagem do token por baixo
-      // Se não está selecionada, usar cor branca normal
-      const fill = square.selected ? (settings && settings.fillColor ? settings.fillColor : '#ff0000') : 'rgba(255,255,255,0.1)';
-      const stroke = '#666';
-      const cssClass = 'grid-selectable';
-      svg += `<rect x="${cx}" y="${cy}" width="${this.currentSquareSize}" height="${this.currentSquareSize}" 
-              fill="${fill}" stroke="${stroke}" 
-              stroke-width="1" data-grid="${key}" 
-              class="${cssClass}" />`;
+      // Set fill color based on selection
+      if (square.selected) {
+        const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
+        graphics.beginFill(fillColor, 0.3);
+      } else {
+        graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
+      }
+      
+      graphics.lineStyle(GRID_STROKE_WIDTH, GRID_STROKE_COLOR);
+      graphics.drawRect(x, y, this.currentSquareSize, this.currentSquareSize);
+      graphics.endFill();
     });
-    
-    // Add effect image if available (behind everything)
+  }
+
+  /**
+   * Adds effect and token images to the preview
+   * @param {PIXI.Graphics} graphics - The PIXI Graphics object
+   * @param {number} centerX - Center X position
+   * @param {number} centerY - Center Y position
+   * @param {Token} token - Token para calcular dimensões da imagem
+   * @param {Object} settings - Configurações incluindo imagem
+   */
+  async addPreviewImages(graphics, centerX, centerY, token = null, settings = null) {
+    // Clear any existing sprites from the parent container
+    if (graphics.parent) {
+      graphics.parent.children.forEach(child => {
+        if (child instanceof PIXI.Sprite && child !== graphics) {
+          graphics.parent.removeChild(child);
+        }
+      });
+    }
+
+    // Add effect image if available - BEHIND the grid graphics
     if (token && settings && settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible) {
-      svg += this.createImageSVG(svgSize, token, settings);
+      try {
+        const texture = await getTexture(settings.imageUrl);
+        if (texture && graphics.parent) {
+          const sprite = new PIXI.Sprite(texture);
+          sprite.anchor.set(0.5, 0.5);
+          
+          // CRÍTICO: Fazer o sprite COMPLETAMENTE não-interativo
+          this.makeCompletelyNonInteractive(sprite);
+          
+          // Definir zIndex muito baixo para garantir que fique atrás
+          sprite.zIndex = EFFECT_IMAGE_Z_INDEX;
+          
+          // Calculate effect image dimensions
+          const gridType = canvas?.grid?.type || CONST.GRID_TYPES.SQUARE;
+          const isHexGrid = [
+            CONST.GRID_TYPES.HEXODDR,
+            CONST.GRID_TYPES.HEXEVENR,
+            CONST.GRID_TYPES.HEXODDQ,
+            CONST.GRID_TYPES.HEXEVENQ,
+          ].includes(gridType);
+          
+          const baseCellSize = isHexGrid ? (this.currentSvgRadius * 2) : this.currentSquareSize;
+          const imageScale = (settings.imageScale || 1.0) * EFFECT_IMAGE_PREVIEW_BASE_SCALE;
+          
+          sprite.scale.set(imageScale * baseCellSize / texture.width);
+          
+          // Apply offsets
+          const offsetScale = baseCellSize / IMAGE_OFFSET_SCALE_FACTOR;
+          sprite.x = centerX + (settings.imageOffsetX || 0) * offsetScale;
+          sprite.y = centerY + (settings.imageOffsetY || 0) * offsetScale;
+          
+          // Apply rotation
+          sprite.rotation = Math.toRadians(settings.imageRotation || 0);
+          sprite.alpha = EFFECT_IMAGE_DEFAULT_OPACITY;
+          
+          // Add ATRÁS do graphics
+          graphics.parent.addChild(sprite);
+          
+          console.log('Size Matters: Effect image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
+        }
+      } catch (error) {
+        console.warn('Size Matters: Failed to load effect image for preview:', error);
+      }
     }
-    
-    // Add token image on top (highest layer)
+
+    // Add token image - TAMBÉM ATRÁS do grid graphics
     if (token && token.document && token.document.texture && token.document.texture.src) {
-      svg += this.createTokenImageSVG(svgSize, token);
+      try {
+        const texture = await getTexture(token.document.texture.src);
+        if (texture && graphics.parent) {
+          const sprite = new PIXI.Sprite(texture);
+          sprite.anchor.set(0.5, 0.5);
+          
+          // CRÍTICO: Fazer o sprite COMPLETAMENTE não-interativo
+          this.makeCompletelyNonInteractive(sprite);
+          
+          // Definir zIndex baixo mas maior que a imagem de efeito
+          sprite.zIndex = TOKEN_IMAGE_Z_INDEX;
+          
+          // Calculate token image size
+          const gridType = canvas?.grid?.type || CONST.GRID_TYPES.SQUARE;
+          const isHexGrid = [
+            CONST.GRID_TYPES.HEXODDR,
+            CONST.GRID_TYPES.HEXEVENR,
+            CONST.GRID_TYPES.HEXODDQ,
+            CONST.GRID_TYPES.HEXEVENQ,
+          ].includes(gridType);
+          
+          let tokenImageSize;
+          if (isHexGrid) {
+            tokenImageSize = this.currentSvgRadius * TOKEN_HEX_IMAGE_SCALE_FACTOR;
+          } else {
+            tokenImageSize = this.currentSquareSize * TOKEN_SQUARE_IMAGE_SCALE_FACTOR;
+          }
+          
+          sprite.scale.set(tokenImageSize / texture.width);
+          sprite.x = centerX;
+          sprite.y = centerY;
+          sprite.alpha = 1.0;
+          
+          // Add ATRÁS do graphics
+          graphics.parent.addChild(sprite);
+          
+          console.log('Size Matters: Token image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
+        }
+      } catch (error) {
+        console.warn('Size Matters: Failed to load token image for preview:', error);
+      }
     }
-    
-    svg += `</svg>`;
-    return svg;
-  }
-
-
-  /**
-   * Cria elemento de imagem SVG para o efeito
-   * @param {number} svgSize - Tamanho do SVG
-   * @param {Token} token - Token para calcular dimensões
-   * @param {Object} settings - Configurações da imagem
-   * @returns {string} Elemento de imagem SVG do efeito
-   */
-  createImageSVG(svgSize, token, settings) {
-    if (!token || !settings || !settings.imageUrl || !settings.imageUrl.trim()) {
-      return '';
-    }
-
-    // Calculate effect image dimensions independently from token size
-    // Use settings properties for effect dimensions, or default to 1x1 grid units
-    const effectWidthInGridUnits = settings.effectGridWidth || 1;
-    const effectHeightInGridUnits = settings.effectGridHeight || 1;
-    
-    // Get current grid cell size based on grid type
-    const gridType = canvas.grid.type;
-    const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
-                       CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-    
-    const baseCellSize = isHexGrid ? (this.currentSvgRadius * 2) : this.currentSquareSize;
-    
-    // Scale effect image based on effect dimensions and user scale setting
-    const imageWidth = baseCellSize * effectWidthInGridUnits * (settings.imageScale || 1.0);
-    const imageHeight = baseCellSize * effectHeightInGridUnits * (settings.imageScale || 1.0);
-    
-    // Calculate position (centered with offsets)
-    const centerX = svgSize / 2;
-    const centerY = svgSize / 2;
-    
-    // Scale offsets proportionally to current grid cell size
-    const offsetScale = baseCellSize / 50; // Proportional offset scaling
-    const offsetX = (settings.imageOffsetX || 0) * offsetScale;
-    const offsetY = (settings.imageOffsetY || 0) * offsetScale;
-    
-    // Position image (top-left corner for SVG image element)
-    const x = centerX - imageWidth / 2 + offsetX;
-    const y = centerY - imageHeight / 2 + offsetY;
-    
-    // Create image element with rotation if needed
-    const rotation = settings.imageRotation || 0;
-    let imageElement = '';
-    
-    if (rotation !== 0) {
-      // Use a group element for rotation
-      imageElement = `<g transform="rotate(${rotation} ${centerX + offsetX} ${centerY + offsetY})">`;
-      imageElement += `<image href="${settings.imageUrl}" x="${x}" y="${y}" width="${imageWidth}" height="${imageHeight}" opacity="0.8" pointer-events="none" />`;
-      imageElement += `</g>`;
-    } else {
-      imageElement = `<image href="${settings.imageUrl}" x="${x}" y="${y}" width="${imageWidth}" height="${imageHeight}" opacity="0.8" pointer-events="none" />`;
-    }
-    
-    return imageElement;
-  }
-
-  /**
-   * Cria elemento de imagem SVG para o token do jogador
-   * @param {number} svgSize - Tamanho do SVG
-   * @param {Token} token - Token para obter a imagem
-   * @returns {string} Elemento de imagem SVG do token
-   */
-  createTokenImageSVG(svgSize, token) {
-    if (!token || !token.document || !token.document.texture || !token.document.texture.src) {
-      return '';
-    }
-
-
-    // Calculate token image dimensions based on grid type
-    const gridType = canvas.grid.type;
-    const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
-                       CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-    
-    let tokenImageSize;
-    if (isHexGrid) {
-      // For hex grids, use the current SVG radius as base size
-      tokenImageSize = this.currentSvgRadius * 1.5;
-    } else {
-      // For square grids, use the current square size
-      tokenImageSize = this.currentSquareSize * 0.8;
-    }
-    
-    // Calculate position (centered in the SVG)
-    const centerX = svgSize / 2;
-    const centerY = svgSize / 2;
-    
-    // Position image (top-left corner for SVG image element)
-    const x = centerX - tokenImageSize / 2;
-    const y = centerY - tokenImageSize / 2;
-    
-    // Create token image element (always fully opaque and on top)
-    const imageElement = `<image href="${token.document.texture.src}" x="${x}" y="${y}" width="${tokenImageSize}" height="${tokenImageSize}" opacity="1.0" style="z-index: 1000;" pointer-events="none" />`;
-    
-    
-    return imageElement;
   }
 
   /**

@@ -2,7 +2,7 @@
   <!-- Grid Selection with Zoom Controls -->
   <div class="sm-grid-wrapper">
     <div class="sm-grid-container">
-      {{{gridSVG}}}
+      <canvas id="sm-grid-preview-canvas" width="350" height="350"></canvas>
     </div>
     {{#unless noToken}}
     <div class="sm-zoom-btn">
@@ -67,10 +67,40 @@
             <input type="text" class="sm-opacity-input" name="alpha" value="{{alpha}}" placeholder="0.0 - 1.0">
           </div>
         </div>
-        <div class="sm-checkbox-row">
-          <label><input type="checkbox" name="enableContour" {{#if enableContour}}checked{{/if}}> Outline</label>
-          <label><input type="checkbox" name="enableFill" {{#if enableFill}}checked{{/if}}> Fill</label>
-          <label><input type="checkbox" name="imageVisible" {{#if imageVisible}}checked{{/if}}> Image</label>
+        <div class="sm-switch-row">
+          <div class="sm-toggle-switch">
+            <input type="checkbox" name="enableContour" id="enableContour" {{#if enableContour}}checked{{/if}}>
+            <label for="enableContour">
+              <span class="sm-toggle-switch-slider"></span>
+              <span class="sm-toggle-switch-label">Outline</span>
+            </label>
+          </div>
+          
+          <div class="sm-toggle-switch">
+            <input type="checkbox" name="enableFill" id="enableFill" {{#if enableFill}}checked{{/if}}>
+            <label for="enableFill">
+              <span class="sm-toggle-switch-slider"></span>
+              <span class="sm-toggle-switch-label">Fill</span>
+            </label>
+          </div>
+          
+          <div class="sm-toggle-switch">
+            <input type="checkbox" name="imageVisible" id="imageVisible" {{#if imageVisible}}checked{{/if}}>
+            <label for="imageVisible">
+              <span class="sm-toggle-switch-slider"></span>
+              <span class="sm-toggle-switch-label">Image</span>
+            </label>
+          </div>
+
+       <div class="sm-toggle-switch">
+  <input type="checkbox" name="enableDirectionalHighlight" id="enableDirectionalHighlight" {{#if enableDirectionalHighlight}}checked{{/if}}>
+  <label for="enableDirectionalHighlight">
+    <span class="sm-toggle-switch-slider"></span>
+    <span class="sm-toggle-switch-label">Directional Colors</span>
+  </label>
+</div>
+
+        
         </div>
       </div>
     </div>
@@ -82,9 +112,7 @@
         <span>Directional Colors</span>
       </div>
       <div class="sm-accordion-content" id="directional-controls">
-        <div class="sm-checkbox-row">
-          <label><input type="checkbox" name="enableDirectionalHighlight" {{#if enableDirectionalHighlight}}checked{{/if}}> Enable Directional Colors</label>
-        </div>
+        
         <div class="sm-directional-buttons">
           <div class="sm-red-directional-group">
             <div class="sm-directional-label">Back</div>
@@ -132,6 +160,5 @@
     </button>
     </div>
   </div>
-
 
 </form>

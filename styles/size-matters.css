@@ -139,6 +139,9 @@
   display: flex;
   gap: 12px;
   margin-top: 4px;
+  align-items: center;
+  flex-wrap: nowrap; /* Forçar que fiquem na mesma linha */
+  justify-content: flex-start;
 }
 
 .sm-checkbox-row label {
@@ -147,12 +150,111 @@
   gap: 4px;
   font-size: 11px;
   cursor: pointer;
+  font-weight: 600;
+  color: #6b6b3a;
+  white-space: nowrap; /* Evitar quebra de linha no texto do label */
+  min-width: auto; /* Remover largura mínima que pode interferir */
 }
 
 .sm-checkbox-row input[type="checkbox"] {
   width: 14px;
   height: 14px;
   accent-color: #8b8b5a;
+  margin: 0;
+  vertical-align: middle;
+  flex-shrink: 0; /* Evitar que o checkbox encolha */
+}
+
+/* Switch Row - replacing checkbox row */
+.sm-switch-row {
+  display: flex;
+  gap: 12px;
+  margin: 20px;
+  flex-wrap: nowrap; /* Manter switches na mesma linha */
+  align-items: center;
+  justify-content: space-evenly;
+  text-align: center;
+
+}
+
+/* Modern Toggle Switch */
+.sm-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+  font-weight: 400;
+  text-align: center;
+}
+
+.sm-toggle-switch input[type="checkbox"] {
+  opacity: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.sm-toggle-switch-slider {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+  background-color: #ccc;
+  border-radius: 20px;
+  transition: background-color 0.3s ease;
+  border: 1px solid #bbb;
+  flex-shrink: 0; /* Evitar que o slider encolha */
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.sm-toggle-switch-slider:before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 1px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.sm-toggle-switch input:checked + label .sm-toggle-switch-slider {
+  background-color: #8b8b5a;
+  border-color: #6b6b3a;
+}
+
+.sm-toggle-switch input:checked + label .sm-toggle-switch-slider:before {
+  transform: translateX(20px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.sm-toggle-switch:hover .sm-toggle-switch-slider {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.sm-toggle-switch input:focus + label .sm-toggle-switch-slider {
+  outline: 2px solid #8b8b5a;
+  outline-offset: 2px;
+}
+
+.sm-toggle-switch-label {
+  user-select: none;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: all;
+  margin-left: 4px;
+  margin-top: 4px;
+}
+
+/* Directional switch - full width */
+.sm-toggle-switch-directional {
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 8px;
 }
 
 /* Button Row - para Browse e Presets lado a lado */

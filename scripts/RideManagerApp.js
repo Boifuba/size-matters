@@ -238,14 +238,14 @@ export class RideManagerApp extends Application {
     });
 
     html.find(".sm-remove-group-btn").click(async (event) => {
-      const leaderId = event.currentTarget.getAttribute("data-leader");
+      const leaderId = event.currentTarget.getAttribute("data-leader-id");
       await this.stopRideForLeader(leaderId);
       this.render(true);
     });
 
     html.find(".sm-remove-follower-btn").click(async (event) => {
-      const leaderId = event.currentTarget.getAttribute("data-leader");
-      const followerId = event.currentTarget.getAttribute("data-follower");
+      const leaderId = event.currentTarget.getAttribute("data-leader-id");
+      const followerId = event.currentTarget.getAttribute("data-follower-id");
       await this.removeFollowerFromGroup(leaderId, followerId);
     });
   }

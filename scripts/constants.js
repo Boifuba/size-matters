@@ -44,7 +44,7 @@ export const DEFAULT_GRID_SIZE_CONFIG = {
   small: {
     hex: {
       gridSize: 10,
-      svgRadius: 18
+      svgRadius: 14
     },
     square: {
       gridSize: 4,
@@ -53,8 +53,8 @@ export const DEFAULT_GRID_SIZE_CONFIG = {
   },
   medium: {
     hex: {
-      gridSize: 4,
-      svgRadius: 28
+      gridSize: 10,
+      svgRadius: 24
     },
     square: {
       gridSize: 4,
@@ -72,3 +72,28 @@ export const DEFAULT_GRID_SIZE_CONFIG = {
     }
   }
 };
+
+// Valores padrão do GridManager
+export const DEFAULT_SVG_RADIUS = 16;
+export const DEFAULT_SQUARE_SIZE = 25;
+
+// Configurações de SVG
+export const SVG_VIEWPORT_SIZE = 300;
+export const GRID_UNSELECTED_FILL_COLOR = 0xF4F4F4;
+export const GRID_UNSELECTED_FILL_ALPHA = 1.0;
+export const GRID_STROKE_COLOR = 0x666666;
+export const GRID_STROKE_WIDTH = 1;
+
+// Configurações de imagem
+export const EFFECT_IMAGE_DEFAULT_OPACITY = 1;
+export const IMAGE_OFFSET_SCALE_FACTOR = 50;
+export const TOKEN_HEX_IMAGE_SCALE_FACTOR = 2;
+export const TOKEN_SQUARE_IMAGE_SCALE_FACTOR = 0.8;
+//Imagem de preview do efeito na seleção do token
+export const EFFECT_IMAGE_PREVIEW_BASE_SCALE = 5;
+
+
+
+
+//isso aqui não tem ue estar aqui
+export const TOKEN_IMAGE_Z_INDEX_STYLE = 'z-index: 1000;';
