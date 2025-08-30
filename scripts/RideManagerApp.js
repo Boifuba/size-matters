@@ -6,6 +6,8 @@
 import {
   startTokenRide,
   stopTokenRide,
+  pauseTokenRide,
+  resumeTokenRide,
   removeFollowerFromTokenRide,
   getActiveRideGroups,
   stopAllTokenRides,
@@ -69,6 +71,7 @@ export class RideManagerApp extends Application {
       ([leaderId, group]) => ({
         leaderId: leaderId,
         leaderName: group.leaderName,
+        isPaused: group.isPaused || false,
         followers: Array.from(group.followers.entries()).map(
           ([followerId, follower]) => ({
             id: followerId,
@@ -197,6 +200,29 @@ export class RideManagerApp extends Application {
     this.render();
   }
 
+  async togglePauseRide(leaderId) {
+    const leaderDocument = canvas.scene.tokens.get(leaderId);
+    if (!leaderDocument) return;
+
+    const group = this.activeGroups.get(leaderId);
+    if (!group) return;
+
+    try {
+      if (group.isPaused) {
+        await resumeTokenRide(leaderDocument);
+      } else {
+        await pauseTokenRide(leaderDocument);
+      }
+
+      // Reload active groups and re-render
+      this.loadActiveGroups();
+      this.render();
+    } catch (error) {
+      console.error("Size Matters: Error toggling ride pause:", error);
+      ui.notifications.error("Error toggling ride pause!");
+    }
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
 
@@ -247,6 +273,11 @@ export class RideManagerApp extends Application {
       const leaderId = event.currentTarget.getAttribute("data-leader-id");
       const followerId = event.currentTarget.getAttribute("data-follower-id");
       await this.removeFollowerFromGroup(leaderId, followerId);
+    });
+
+    html.find(".sm-toggle-pause-btn").click(async (event) => {
+      const leaderId = event.currentTarget.getAttribute("data-leader-id");
+      await this.togglePauseRide(leaderId);
     });
   }
 }

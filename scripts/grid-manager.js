@@ -243,8 +243,13 @@ export class GridManager {
       
       // Set fill color based on selection
       if (h.selected) {
-        const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
-        graphics.beginFill(fillColor, 0.3);
+        if (settings?.enableFill) {
+          const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
+          graphics.beginFill(fillColor, 0.3);
+        } else {
+          // Use visible light gray when fill is disabled to show selection without confusion
+          graphics.beginFill(0xCCCCCC, 0.6);
+        }
       } else {
         graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
       }
@@ -325,8 +330,13 @@ export class GridManager {
 
       // Set fill color based on selection
       if (square.selected) {
-        const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
-        graphics.beginFill(fillColor, 0.3);
+        if (settings?.enableFill) {
+          const fillColor = settings?.fillColor ? parseInt(settings.fillColor.replace('#', '0x')) : 0xff0000;
+          graphics.beginFill(fillColor, 0.3);
+        } else {
+          // Use visible light gray when fill is disabled to show selection without confusion
+          graphics.beginFill(0xCCCCCC, 0.6);
+        }
       } else {
         graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
       }
@@ -440,7 +450,6 @@ export class GridManager {
           // Add ATRÁS do graphics
           graphics.parent.addChild(sprite);
           
-          console.log('Size Matters: Token image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
         }
       } catch (error) {
         console.warn('Size Matters: Failed to load token image for preview:', error);

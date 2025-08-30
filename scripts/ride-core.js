@@ -137,6 +137,7 @@ async function startTokenRide(leaderToken, followersMap) {
     leaderName: leaderToken.name,
     followers: processedFollowers,
     hookId: hookId,
+    isPaused: false,
     startTime: Date.now()
   };
 
@@ -151,6 +152,7 @@ async function startTokenRide(leaderToken, followersMap) {
     
     await leaderToken.document.setFlag('size-matters', 'activeRideId', rideId);
     await leaderToken.document.setFlag('size-matters', 'rideFollowers', followersObj);
+    await leaderToken.document.setFlag('size-matters', 'isRidePaused', false);
   } catch (error) {
     // Cleanup on failure
     Hooks.off("updateToken", hookId);
@@ -191,6 +193,7 @@ async function stopTokenRide(leaderTokenOrDocument, suppressNotification = false
   try {
     await leaderDocument.unsetFlag('size-matters', 'activeRideId');
     await leaderDocument.unsetFlag('size-matters', 'rideFollowers');
+    await leaderDocument.unsetFlag('size-matters', 'isRidePaused');
   } catch (error) {
     console.warn(`Size Matters | Could not unset flags for token ${leaderId}`, error);
   }
@@ -198,6 +201,81 @@ async function stopTokenRide(leaderTokenOrDocument, suppressNotification = false
   if (!suppressNotification) {
     ui.notifications.info("Ride stopped! Followers released.");
   }
+}
+
+/**
+ * Pauses an active token ride by removing the update hook
+ * 
+ * @param {TokenDocument|Token} leaderTokenOrDocument - The leader token document or object
+ * @returns {Promise<boolean>} True if ride was paused, false if no active ride found
+ */
+async function pauseTokenRide(leaderTokenOrDocument) {
+  if (!leaderTokenOrDocument) return false;
+  
+  // Handle both Token objects and TokenDocument objects
+  const leaderDocument = leaderTokenOrDocument.document || leaderTokenOrDocument;
+  const leaderId = leaderDocument.id;
+
+  const rideId = leaderDocument.getFlag('size-matters', 'activeRideId');
+  if (!rideId || !activeRides.has(rideId)) return false;
+
+  const rideData = activeRides.get(rideId);
+  if (rideData.isPaused) return false; // Already paused
+
+  // Remove the update hook to pause movement
+  if (rideData.hookId) {
+    Hooks.off("updateToken", rideData.hookId);
+    rideData.hookId = null;
+  }
+
+  // Mark as paused
+  rideData.isPaused = true;
+
+  // Update persistence flag
+  try {
+    await leaderDocument.setFlag('size-matters', 'isRidePaused', true);
+  } catch (error) {
+    console.warn(`Size Matters | Could not set pause flag for token ${leaderId}`, error);
+  }
+
+  ui.notifications.info(`Ride paused for ${rideData.leaderName}!`);
+  return true;
+}
+
+/**
+ * Resumes a paused token ride by recreating the update hook
+ * 
+ * @param {TokenDocument|Token} leaderTokenOrDocument - The leader token document or object
+ * @returns {Promise<boolean>} True if ride was resumed, false if no paused ride found
+ */
+async function resumeTokenRide(leaderTokenOrDocument) {
+  if (!leaderTokenOrDocument) return false;
+  
+  // Handle both Token objects and TokenDocument objects
+  const leaderDocument = leaderTokenOrDocument.document || leaderTokenOrDocument;
+  const leaderId = leaderDocument.id;
+
+  const rideId = leaderDocument.getFlag('size-matters', 'activeRideId');
+  if (!rideId || !activeRides.has(rideId)) return false;
+
+  const rideData = activeRides.get(rideId);
+  if (!rideData.isPaused) return false; // Not paused
+
+  // Recreate the update hook to resume movement
+  rideData.hookId = createFollowHook(leaderId, rideData.followers);
+
+  // Mark as active
+  rideData.isPaused = false;
+
+  // Update persistence flag
+  try {
+    await leaderDocument.setFlag('size-matters', 'isRidePaused', false);
+  } catch (error) {
+    console.warn(`Size Matters | Could not unset pause flag for token ${leaderId}`, error);
+  }
+
+  ui.notifications.info(`Ride resumed for ${rideData.leaderName}!`);
+  return true;
 }
 
 /**
@@ -275,6 +353,7 @@ async function restoreRidesFromFlags() {
   for (const token of canvas.tokens.placeables) {
     const rideId = token.document.getFlag('size-matters', 'activeRideId');
     const followersData = token.document.getFlag('size-matters', 'rideFollowers');
+    const isPaused = token.document.getFlag('size-matters', 'isRidePaused') || false;
     
     if (rideId && followersData && !activeRides.has(rideId)) {
       const followersMap = new Map(Object.entries(followersData));
@@ -282,6 +361,20 @@ async function restoreRidesFromFlags() {
       if (followersMap.size > 0) {
         try {
           await startTokenRide(token, followersMap);
+          
+          // If the ride was paused, pause it again after restoration
+          if (isPaused) {
+            const rideData = activeRides.get(rideId);
+            if (rideData) {
+              // Remove the hook and mark as paused without notifications
+              if (rideData.hookId) {
+                Hooks.off("updateToken", rideData.hookId);
+                rideData.hookId = null;
+              }
+              rideData.isPaused = true;
+            }
+          }
+          
           ui.notifications.info(`Ride restored: ${token.name} with ${followersMap.size} follower(s).`);
         } catch (error) {
           console.warn(`Size Matters | Failed to restore ride for leader ${token.id}`, error);
@@ -289,6 +382,7 @@ async function restoreRidesFromFlags() {
           try {
             await token.document.unsetFlag('size-matters', 'activeRideId');
             await token.document.unsetFlag('size-matters', 'rideFollowers');
+            await token.document.unsetFlag('size-matters', 'isRidePaused');
           } catch (flagError) {
             // Silent fail for flag cleanup
           }
@@ -298,6 +392,7 @@ async function restoreRidesFromFlags() {
         try {
           await token.document.unsetFlag('size-matters', 'activeRideId');
           await token.document.unsetFlag('size-matters', 'rideFollowers');
+          await token.document.unsetFlag('size-matters', 'isRidePaused');
         } catch (flagError) {
           // Silent fail for flag cleanup
         }
@@ -316,7 +411,8 @@ function getActiveRideGroups() {
   activeRides.forEach((rideData) => {
     activeGroups.set(rideData.leaderId, {
       leaderName: rideData.leaderName,
-      followers: rideData.followers
+      followers: rideData.followers,
+      isPaused: rideData.isPaused
     });
   });
   return activeGroups;
@@ -391,6 +487,8 @@ function toggleQuickFollow() {
 export {
   startTokenRide,
   stopTokenRide,
+  pauseTokenRide,
+  resumeTokenRide,
   removeFollowerFromTokenRide,
   getActiveRideGroups,
   stopAllTokenRides,

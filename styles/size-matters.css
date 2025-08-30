@@ -920,25 +920,82 @@
   font-size: 12px;
 }
 
+.sm-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sm-toggle-pause-btn {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #8b8b5a;
+  border-radius: 4px;
+  color: #6b6b3a;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sm-toggle-pause-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: #6b6b3a;
+  color: #5a5a32;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sm-toggle-pause-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Fix icon alignment in toggle pause button */
+.sm-toggle-pause-btn i {margin-left: 4px;
+
+}  
+  .sm-remove-group-btn i{
+margin-left: 2px;
+}
+/* Specific adjustment for play icon visual centering */
+.sm-toggle-pause-btn i.fa-play {
+  margin-left: 2px;
+}
+
 .sm-remove-group-btn {
-  width: 20px;
-  height: 20px;
-  background: none !important;
-  border: none !important;
-  box-shadow: none !important;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dc3545;
+  border-radius: 4px;
   color: #dc3545;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   padding: 0 !important;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .sm-remove-group-btn:hover {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: #c82333;
   color: #c82333;
-  box-shadow: none !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sm-remove-group-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .sm-followers-info {

@@ -39,27 +39,16 @@
 - **Consistent API:** Legacy functions still work but use the new optimized system  
 
 
+## 1.2.3
 
-### 4 
-Key Improvements:
+###  Fixes
+- Unnecessary redraws and lack of object pooling 
+- Solved generic try-catch and silent errors
+- Deprecated API removed
 
-    Single Debounced Handler: Replaced debouncedSave and debouncedDraw with one consolidated debouncedSaveAndDraw function.
+## 1.2.4
 
-    Coordinated Operations: The new handler ensures that save and draw operations are always executed together in the correct sequence:
-        Save settings first
-        Save global defaults
-        Redraw grid (if HTML element is provided)
+###  Additional Improvements
+- The button in the HUD to mount and dismount can now be hidden, in case the user does not want it to appear in the HUD.
 
-    Optimized Timing: Uses a single 300ms debounce period (the higher of the two previous values) to ensure all rapid changes are batched together.
 
-    Error Handling: Added try-catch block to handle potential errors gracefully and provide user feedback.
-
-    Simplified API: The saveAndDraw(html) method now has a cleaner implementation with just one function call.
-
-Benefits:
-
-    Eliminates Race Conditions: No more overlapping save/draw operations
-    Reduces Redundant Operations: saveGlobalDefaults() is called only once per batch of changes
-    Improves Performance: Fewer database writes and canvas redraws
-    Better UX: Smoother interactions with less stuttering during rapid changes
-    Easier Maintenance: Single point of control for debounced operations

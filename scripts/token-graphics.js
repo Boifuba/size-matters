@@ -109,6 +109,9 @@ async function drawSizeMattersGraphicsForToken(token) {
   clearTokenSizeMattersGraphics(token);
 
   token.sizeMattersContainer = new PIXI.Container();
+  // CRÍTICO: Nomear o container para permitir limpeza via socket
+  token.sizeMattersContainer.name = `SizeMattersContainer-${token.id}`;
+  
   // Fazer o container também não-interativo para garantir que cliques passem através
   makeNonInteractive(token.sizeMattersContainer);
   
@@ -148,54 +151,6 @@ async function drawSizeMattersGraphicsForToken(token) {
     }
   }
 
-  // Load token image for rendering on top
-  if (token.document && token.document.texture && token.document.texture.src) {
-    try {
-      const tokenTexture = await getTexture(token.document.texture.src);
-      if (tokenTexture) {
-        token.sizeMattersTokenImage = new PIXI.Sprite(tokenTexture);
-        token.sizeMattersTokenImage.anchor.set(0.5, 0.5);
-        
-        // CRÍTICO: Fazer a imagem do token completamente não-interativa
-        makeNonInteractive(token.sizeMattersTokenImage);
-        
-        // FORÇA propriedades adicionais para garantir que não capture cliques
-        token.sizeMattersTokenImage.interactive = false;
-        token.sizeMattersTokenImage.interactiveChildren = false;
-        token.sizeMattersTokenImage.eventMode = 'none';
-        token.sizeMattersTokenImage.hitArea = null;
-        token.sizeMattersTokenImage.buttonMode = false;
-        
-        // Se tiver referência ao DOM, aplica pointer-events: none
-        if (token.sizeMattersTokenImage.view) {
-          token.sizeMattersTokenImage.view.style.pointerEvents = 'none';
-          token.sizeMattersTokenImage.view.style.userSelect = 'none';
-        }
-        
-        // Calculate token image size based on grid type and token size
-        const gridType = canvas.grid.type;
-        const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR,
-                           CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-        const gridSize = canvas.grid.size;
-        
-        let tokenImageSize;
-        if (isHexGrid) {
-          const hexRadius = gridSize / Math.sqrt(3);
-          tokenImageSize = hexRadius * 1.5;
-        } else {
-          tokenImageSize = gridSize * 0.8;
-        }
-        
-        // Scale the token image to fit the grid cell
-        const scaleX = tokenImageSize / tokenTexture.width;
-        const scaleY = tokenImageSize / tokenTexture.height;
-        const scale = Math.min(scaleX, scaleY);
-        token.sizeMattersTokenImage.scale.set(scale, scale);
-      }
-    } catch (error) {
-      console.warn("Size Matters: Falha ao carregar imagem do token", token.id, error);
-    }
-  }
 
   let gridDataForDrawing = settings.grid || {};
   let selectedCellsForDrawing = Object.values(gridDataForDrawing).filter(h => h.selected);
@@ -237,10 +192,6 @@ async function drawSizeMattersGraphicsForToken(token) {
     token.sizeMattersContainer.addChild(token.sizeMattersImage);
   }
 
-  // Add token image on top (highest layer)
-  if (token.sizeMattersTokenImage) {
-    token.sizeMattersContainer.addChild(token.sizeMattersTokenImage);
-  }
 
   // Configure o ticker apenas se houver algo para exibir (grid ou imagem)
   if (token.sizeMattersContainer.children.length > 0) {
@@ -347,7 +298,7 @@ export function setupTicker(token, settings) {
     container.position.set(token.center.x, token.center.y);
     container.rotation = tokenRotation;
     
-    container.visible = token.visible && ((settings.gridVisible !== false) || (settings.imageVisible !== false));
+    container.visible = (settings.gridVisible !== false) || (settings.imageVisible !== false);
     
     // REFORÇA que o container não deve capturar eventos
     container.interactive = false;
@@ -381,17 +332,6 @@ export function setupTicker(token, settings) {
       token.sizeMattersImage.hitArea = null;
     }
 
-    if (token.sizeMattersTokenImage) {
-      // Token image is always visible when the container is visible
-      token.sizeMattersTokenImage.visible = true;
-      token.sizeMattersTokenImage.position.set(0, 0); // Centered in container
-      
-      // REFORÇA que a imagem do token não deve capturar eventos
-      token.sizeMattersTokenImage.interactive = false;
-      token.sizeMattersTokenImage.interactiveChildren = false;
-      token.sizeMattersTokenImage.eventMode = 'none';
-      token.sizeMattersTokenImage.hitArea = null;
-    }
   };
 
   token.sizeMattersGridTicker();
@@ -402,6 +342,9 @@ function clearTokenSizeMattersGraphics(token) {
   if (!token) return;
 
   if (token.sizeMattersContainer) {
+    // TORNA INVISÍVEL IMEDIATAMENTE para evitar persistência visual
+    token.sizeMattersContainer.visible = false;
+    
     try {
       if (token.sizeMattersContainer.parent) {
         token.sizeMattersContainer.parent.removeChild(token.sizeMattersContainer);
@@ -423,10 +366,6 @@ function clearTokenSizeMattersGraphics(token) {
   }
   token.sizeMattersImage = null;
 
-  if (token.sizeMattersTokenImage) {
-    // Token image is already destroyed as a child of sizeMattersContainer
-  }
-  token.sizeMattersTokenImage = null;
 
   if (token.sizeMattersGridTicker) {
     try {

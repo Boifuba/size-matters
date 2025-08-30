@@ -29,16 +29,25 @@
         <div class="sm-group-item">
           <div class="sm-group-header">
             <strong>Leader: {{leaderName}}</strong>
-            <button type="button" class="sm-remove-group-btn" data-leader="{{leaderId}}">
-              <i class="fas fa-times"></i>
-            </button>
+            <div class="sm-group-actions">
+              <button type="button" class="sm-toggle-pause-btn" data-leader-id="{{leaderId}}" title="{{#if isPaused}}Resume Ride{{else}}Pause Ride{{/if}}">
+                {{#if isPaused}}
+                  <i class="fas fa-play"></i>
+                {{else}}
+                  <i class="fas fa-pause"></i>
+                {{/if}}
+              </button>
+              <button type="button" class="sm-remove-group-btn" data-leader-id="{{leaderId}}" title="Stop Ride">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
           </div>
           <div class="sm-followers-info">
             Followers: 
             {{#each followers}}
               <span class="sm-follower-tag">
                 {{name}}
-                <button type="button" class="sm-remove-follower-btn" data-leader="{{../leaderId}}" data-follower="{{id}}">
+                <button type="button" class="sm-remove-follower-btn" data-leader-id="{{../leaderId}}" data-follower-id="{{id}}">
                   <i class="fas fa-times"></i>
                 </button>
               </span>

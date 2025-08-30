@@ -198,11 +198,6 @@ export class SizeMattersApp extends Application {
   }
 
   async setControlledToken(token) {
-    // Clear graphics from old token first
-    if (this.token && this.token.id !== (token ? token.id : null)) {
-      clearTokenSizeMattersGraphics(this.token);
-    }
-
     this.token = token;
     this.tokenId = token ? token.id : null;
     this.loadSettings();
@@ -848,6 +843,20 @@ export class SizeMattersApp extends Application {
     // Clear token-specific settings
     if (this.token) {
       await this.token.document.unsetFlag("size-matters", "settings");
+      
+      // Broadcast effect removal to all clients
+      if (game.modules.get("size-matters").api._socket) {
+        game.modules.get("size-matters").api._socket.emit("module.size-matters", {
+          action: "removeTokenEffect",
+          payload: {
+            tokenId: this.token.id,
+            sceneId: canvas.scene.id
+          }
+        });
+      }
+      
+      // FORÇA remoção local imediata
+      clearTokenSizeMattersGraphics(this.token);
     }
 
     // Force immediate save of cleared settings
