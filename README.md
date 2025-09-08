@@ -175,4 +175,10 @@ To access the functions, use `game.modules.get("size-matters").api.<functionName
 
 ---
 
-We hope you enjoy the **Size Matters** module to enhance your Foundry VTT sessions!
+### Support the Project
+
+Consider supporting the project to help ongoing development.
+
+<a href="https://www.buymeacoffee.com/boifuba" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="40">
+</a>
