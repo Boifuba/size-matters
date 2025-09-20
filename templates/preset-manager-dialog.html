@@ -10,13 +10,34 @@
     </div>
   </div>
 
-  
+  <!-- Token Placement Mode Section -->
+  <div class="sm-placement-mode-section">
+    <div class="sm-placement-mode-controls">
+      <label class="sm-placement-checkbox" for="placement-mode-checkbox">
+        <input type="checkbox" id="placement-mode-checkbox" {{#if placementModeActive}}checked{{/if}}>
+        <span class="sm-checkbox-label">Enable Token Placement Mode</span>
+      </label>
+      {{#if placementModeActive}}
+        {{#if selectedPresetForPlacement}}
+          <div class="sm-selected-preset-info">
+            <small>Selected for placement: <strong>{{selectedPresetForPlacement}}</strong></small>
+          </div>
+        {{else}}
+          <div class="sm-no-preset-selected">
+            <small><em>Click on a preset thumbnail below to select it for placement</em></small>
+          </div>
+        {{/if}}
+      {{/if}}
+    </div>
+  </div>
  
   <div class="sm-preset-list">
     {{#if presets.length}}
       {{#each presets}}
-      <div class="sm-preset-item" data-preset-name="{{name}}">
-        <i class="fas fa-close sm-delete-preset-btn" data-preset-name="{{name}}"></i>
+      <div class="sm-preset-item {{#if isSelected}}sm-preset-selected{{/if}}" data-preset-name="{{name}}">
+        <div class="sm-preset-controls">
+          <i class="fas fa-times sm-delete-preset-btn" data-preset-name="{{name}}"></i>
+        </div>
         <div class="sm-preset-thumbnail">
           {{#if imageUrl}}
             {{#if isVideo}}
@@ -38,6 +59,15 @@
         <div class="sm-preset-details-container">
           <div class="sm-preset-info">
             <h4 class="sm-preset-name">{{name}}</h4>
+            {{#if ../placementModeActive}}
+              <div class="sm-preset-placement-hint">
+                <small><em>{{#if isSelected}}Selected - Click canvas to place{{else}}Click to select{{/if}}</em></small>
+              </div>
+            {{else}}
+              <div class="sm-preset-apply-hint">
+                <small><em>Click to apply to selected token</em></small>
+              </div>
+            {{/if}}
           </div>
         </div>
       </div>
@@ -50,6 +80,7 @@
       </div>
     {{/if}}
   </div>
+  
   <!-- Import/Export Section -->
   <div class="sm-import-export-section">
     <h3>Import/Export Presets</h3>

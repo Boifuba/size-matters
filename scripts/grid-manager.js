@@ -405,7 +405,7 @@ export class GridManager {
           // Add ATRÁS do graphics
           graphics.parent.addChild(sprite);
           
-          console.log('Size Matters: Effect image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
+          // console.log('Size Matters: Effect image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
         }
       } catch (error) {
         console.warn('Size Matters: Failed to load effect image for preview:', error);

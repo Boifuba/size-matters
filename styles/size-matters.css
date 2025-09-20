@@ -520,7 +520,7 @@
 
 /* Preset Manager Dialog Styles - ESPAÇAMENTOS REDUZIDOS */
 .sm-preset-manager-form {
-  max-width: 600px;
+  max-width: auto;
   font-size: 12px;
 }
 
@@ -583,8 +583,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 12px;
-    display: flex
-;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
@@ -595,6 +594,58 @@
 .sm-save-current-btn:hover {
   background: #555;
   transform: translateY(-1px);
+}
+
+/* Placement Mode Section */
+.sm-placement-mode-section {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.3);
+  border-radius: 4px;
+  border: 1px solid #d4d4aa;
+}
+
+.sm-placement-mode-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sm-placement-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6b3a;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sm-placement-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #8b8b5a;
+  margin: 0;
+  cursor: pointer;
+}
+
+.sm-selected-preset-info {
+  padding: 4px 8px;
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid #28a745;
+  border-radius: 3px;
+  color: #155724;
+  font-size: 11px;
+}
+
+.sm-no-preset-selected {
+  padding: 4px 8px;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid #ffc107;
+  border-radius: 3px;
+  color: #856404;
+  font-size: 11px;
 }
 
 /* Import/Export Section */
@@ -665,10 +716,22 @@
 }
 
 .sm-preset-item:hover {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.5);
   border-color: #8b8b5a;
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Selected preset styling */
+.sm-preset-selected {
+  background: rgba(40, 167, 69, 0.1) !important;
+  border-color: #28a745 !important;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.3) !important;
+}
+
+.sm-preset-selected:hover {
+  background: rgba(40, 167, 69, 0.15) !important;
+  border-color: #218838 !important;
 }
 
 .sm-delete-preset-btn {
@@ -744,6 +807,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sm-preset-placement-hint,
+.sm-preset-apply-hint {
+  color: #666;
+  font-style: italic;
 }
 
 .sm-preset-details {
