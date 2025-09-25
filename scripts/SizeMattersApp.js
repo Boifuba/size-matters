@@ -150,9 +150,9 @@ export class SizeMattersApp extends Application {
         this.gridGraphics.parent.setChildIndex(this.gridGraphics, this.gridGraphics.parent.children.length - 1);
       }
       
-      console.log('Size Matters: Grid redrawn - children count:', this.pixiApp.stage.children.length, 'graphics zIndex:', this.gridGraphics.zIndex);
+
     } catch (error) {
-      console.error('Size Matters: Failed to redraw grid preview:', error);
+      // console.error('Size Matters: Failed to redraw grid preview:', error);
     }
   }
 
