@@ -52,3 +52,8 @@
 - The button in the HUD to mount and dismount can now be hidden, in case the user does not want it to appear in the HUD.
 
 
+## 1.3.0
+
+### - Effects directly on cavas 
+- Effects can be applied anywhere on the grid; it will automatically add an invisible token to the canvas.
+- Minor improvements on Presets Dialog.

@@ -214,13 +214,17 @@ export function createGridGraphics(settings, gridData, hexRadius = null, gridSiz
   const fillColor = parseInt(settings.fillColor.replace("#", "0x"));
   const gridType  = canvas.grid.type;
   const isHexGrid = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR, CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ].includes(gridType);
-  const size      = gridSize || canvas.grid.size;
+  
+  // Use consistent sizing with preview - get from GridManager or settings
+  const size = gridSize || canvas.grid.size;
+  
+  // For hex grids, use the same radius calculation as preview
+  const actualHexRadius = hexRadius || (size / Math.sqrt(3));
 
   const enableDirectionalHighlight = settings.enableDirectionalHighlight;
 
   if (isHexGrid) {
     const isPointyTop = [CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(gridType);
-    const actualHexRadius = hexRadius || (size / Math.sqrt(3));
 
     // Use the new directional colors utility
     const result = calculateDirectionalColors(selectedCells, actualHexRadius, isPointyTop, settings);
@@ -317,7 +321,10 @@ export function setupTicker(token, settings) {
 
     if (token.sizeMattersImage) {
       token.sizeMattersImage.visible = (settings.imageVisible !== false);
-      token.sizeMattersImage.scale.set(settings.imageScale || 1.0);
+      
+      // Aplicar apenas a escala do usuário no canvas real
+      const finalScale = settings.imageScale || 1.0;
+      token.sizeMattersImage.scale.set(finalScale);
       
       const offsetX = settings.imageOffsetX || 0;
       const offsetY = settings.imageOffsetY || 0;

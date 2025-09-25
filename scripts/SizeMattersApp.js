@@ -117,6 +117,27 @@ export class SizeMattersApp extends Application {
     }
 
     try {
+      // Force clear any existing preview sprites before redrawing
+      if (this.pixiApp && this.pixiApp.stage) {
+        const spritesToRemove = [];
+        this.pixiApp.stage.children.forEach(child => {
+          if (child instanceof PIXI.Sprite && 
+              (child.name === 'SizeMattersPreviewEffect' || child.name === 'SizeMattersPreviewToken')) {
+            spritesToRemove.push(child);
+          }
+        });
+        
+        spritesToRemove.forEach(sprite => {
+          try {
+            sprite.visible = false;
+            this.pixiApp.stage.removeChild(sprite);
+            sprite.destroy({ children: true, texture: false, baseTexture: false });
+          } catch (error) {
+            console.warn('Size Matters: Error removing preview sprite in redraw:', error);
+          }
+        });
+      }
+      
       await this.gridManager.drawGridPreview(this.gridGraphics, this.token, this.settings);
       
       // FORÇA TOTAL refresh do stage
@@ -129,7 +150,7 @@ export class SizeMattersApp extends Application {
         this.gridGraphics.parent.setChildIndex(this.gridGraphics, this.gridGraphics.parent.children.length - 1);
       }
       
-      console.log('Size Matters: Grid redrawn - zIndex:', this.gridGraphics.zIndex, 'interactive:', this.gridGraphics.interactive, 'children count:', this.pixiApp.stage.children.length);
+      console.log('Size Matters: Grid redrawn - children count:', this.pixiApp.stage.children.length, 'graphics zIndex:', this.gridGraphics.zIndex);
     } catch (error) {
       console.error('Size Matters: Failed to redraw grid preview:', error);
     }
@@ -890,6 +911,27 @@ export class SizeMattersApp extends Application {
   }
 
   async close(options = {}) {
+    // Clean up all preview sprites before closing
+    if (this.pixiApp && this.pixiApp.stage) {
+      const spritesToRemove = [];
+      this.pixiApp.stage.children.forEach(child => {
+        if (child instanceof PIXI.Sprite && 
+            (child.name === 'SizeMattersPreviewEffect' || child.name === 'SizeMattersPreviewToken')) {
+          spritesToRemove.push(child);
+        }
+      });
+      
+      spritesToRemove.forEach(sprite => {
+        try {
+          sprite.visible = false;
+          this.pixiApp.stage.removeChild(sprite);
+          sprite.destroy({ children: true, texture: false, baseTexture: false });
+        } catch (error) {
+          console.warn('Size Matters: Error cleaning preview sprites on close:', error);
+        }
+      });
+    }
+    
     // Destroy PIXI application
     if (this.pixiApp) {
       this.pixiApp.destroy(true);

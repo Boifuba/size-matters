@@ -87,10 +87,10 @@ export const GRID_STROKE_WIDTH = 1;
 // Configurações de imagem
 export const EFFECT_IMAGE_DEFAULT_OPACITY = 1;
 export const IMAGE_OFFSET_SCALE_FACTOR = 50;
-export const TOKEN_HEX_IMAGE_SCALE_FACTOR = 2;
+export const TOKEN_HEX_IMAGE_SCALE_FACTOR = 1;
 export const TOKEN_SQUARE_IMAGE_SCALE_FACTOR = 0.8;
 //Imagem de preview do efeito na seleção do token
-export const EFFECT_IMAGE_PREVIEW_BASE_SCALE = 5;
+export const EFFECT_IMAGE_PREVIEW_BASE_SCALE = 0.4;
 
 
 

@@ -19,8 +19,8 @@ import {
   IMAGE_OFFSET_SCALE_FACTOR,
   TOKEN_HEX_IMAGE_SCALE_FACTOR,
   TOKEN_SQUARE_IMAGE_SCALE_FACTOR,
-  EFFECT_IMAGE_PREVIEW_BASE_SCALE,
-  TOKEN_IMAGE_Z_INDEX_STYLE
+  TOKEN_IMAGE_Z_INDEX_STYLE,
+  EFFECT_IMAGE_PREVIEW_BASE_SCALE
 } from './constants.js';
 
 // Z-Index Definitions for layering order
@@ -177,6 +177,21 @@ export class GridManager {
   }
 
   /**
+   * Calcula o fator de escala do preview baseado no zoom level atual
+   * @returns {number} Fator de escala para o preview
+   */
+  getPreviewScaleFactor() {
+    // Usar medium como baseline (escala 1.0)
+    const zoomScales = {
+      'small': 0.5,   // 50% do tamanho médio
+      'medium': 1.0,  // Tamanho base
+      'large': 1.5    // 150% do tamanho médio
+    };
+    
+    return zoomScales[this.currentZoomLevel] || 1.0;
+  }
+
+  /**
    * Draws the grid preview using PIXI.Graphics
    * @param {PIXI.Graphics} graphics - The PIXI Graphics object to draw on
    * @param {Token} token - Token para calcular dimensões da imagem
@@ -226,6 +241,11 @@ export class GridManager {
    */
   async drawHexGridPreview(graphics, centerX, centerY, isPointyTop, token = null, settings = null) {
     const selectedCells = Object.values(this.grid).filter(cell => cell.selected);
+    const scaleFactor = this.getPreviewScaleFactor();
+    
+    // Use the same radius as the real canvas for consistency
+    const canvasGridSize = canvas?.grid?.size || 100;
+    const canvasHexRadius = canvasGridSize / Math.sqrt(3);
     
     // Draw all grid cells first
     Object.entries(this.grid).forEach(([key, h]) => {
@@ -254,7 +274,9 @@ export class GridManager {
         graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
       }
       
-      graphics.lineStyle(GRID_STROKE_WIDTH, GRID_STROKE_COLOR);
+      // Escalar a espessura da linha proporcionalmente
+      const scaledStrokeWidth = GRID_STROKE_WIDTH * scaleFactor;
+      graphics.lineStyle(scaledStrokeWidth, GRID_STROKE_COLOR);
       graphics.drawPolygon(points);
       graphics.endFill();
     });
@@ -273,26 +295,34 @@ export class GridManager {
         selectedCellsForDrawing = Object.values(gridDataForDrawing);
       }
 
+      // Use canvas hex radius for directional calculation but scale the result
       const result = calculateDirectionalColors(
         selectedCellsForDrawing, 
-        this.currentSvgRadius, 
+        canvasHexRadius, 
         isPointyTop, 
         settings
       );
 
       if (result.edges && result.colors) {
-        // Draw directional colored edges
+        // Calculate scale factor between canvas and preview
+        const previewScale = this.currentSvgRadius / canvasHexRadius;
+        
+        // Draw directional colored edges with scaled thickness
+        const scaledThickness = (settings.thickness || 3) * scaleFactor;
+        
         result.edges.forEach((edge, index) => {
           const color = result.colors[index];
-          graphics.lineStyle(settings.thickness || 3, color, 1.0);
-          graphics.moveTo(centerX + edge.p1.x, centerY + edge.p1.y);
-          graphics.lineTo(centerX + edge.p2.x, centerY + edge.p2.y);
+          graphics.lineStyle(scaledThickness, color, 1.0);
+          // Scale the edge positions to match preview scale
+          graphics.moveTo(centerX + edge.p1.x * previewScale, centerY + edge.p1.y * previewScale);
+          graphics.lineTo(centerX + edge.p2.x * previewScale, centerY + edge.p2.y * previewScale);
         });
       }
     } else if (settings?.enableContour && selectedCells.length > 0) {
-      // Draw normal outline without directional colors
+      // Draw normal outline without directional colors with scaled thickness
       const outlineColor = settings?.color ? parseInt(settings.color.replace('#', '0x')) : 0xff0000;
-      graphics.lineStyle(settings.thickness || 3, outlineColor, 1.0);
+      const scaledThickness = (settings.thickness || 3) * scaleFactor;
+      graphics.lineStyle(scaledThickness, outlineColor, 1.0);
       
       // Simple outline for preview (could be enhanced with the same path logic)
       selectedCells.forEach(cell => {
@@ -322,6 +352,8 @@ export class GridManager {
    * @param {Object} settings - Configurações incluindo imagem
    */
   async drawSquareGridPreview(graphics, centerX, centerY, token = null, settings = null) {
+    const scaleFactor = this.getPreviewScaleFactor();
+    
     // Draw all grid cells
     Object.entries(this.grid).forEach(([key, square]) => {
       const pos = squareToPixel(square.q, square.r, this.currentSquareSize);
@@ -341,10 +373,29 @@ export class GridManager {
         graphics.beginFill(GRID_UNSELECTED_FILL_COLOR, GRID_UNSELECTED_FILL_ALPHA);
       }
       
-      graphics.lineStyle(GRID_STROKE_WIDTH, GRID_STROKE_COLOR);
+      // Escalar a espessura da linha proporcionalmente
+      const scaledStrokeWidth = GRID_STROKE_WIDTH * scaleFactor;
+      graphics.lineStyle(scaledStrokeWidth, GRID_STROKE_COLOR);
       graphics.drawRect(x, y, this.currentSquareSize, this.currentSquareSize);
       graphics.endFill();
     });
+
+    // Draw contours for selected cells if enabled
+    if (settings?.enableContour) {
+      const selectedCells = Object.values(this.grid).filter(cell => cell.selected);
+      if (selectedCells.length > 0) {
+        const outlineColor = settings?.color ? parseInt(settings.color.replace('#', '0x')) : 0xff0000;
+        const scaledThickness = (settings.thickness || 3) * scaleFactor;
+        graphics.lineStyle(scaledThickness, outlineColor, 1.0);
+        
+        selectedCells.forEach(cell => {
+          const pos = squareToPixel(cell.q, cell.r, this.currentSquareSize);
+          const x = centerX + pos.x - this.currentSquareSize / 2;
+          const y = centerY + pos.y - this.currentSquareSize / 2;
+          graphics.drawRect(x, y, this.currentSquareSize, this.currentSquareSize);
+        });
+      }
+    }
   }
 
   /**
@@ -356,14 +407,35 @@ export class GridManager {
    * @param {Object} settings - Configurações incluindo imagem
    */
   async addPreviewImages(graphics, centerX, centerY, token = null, settings = null) {
-    // Clear any existing sprites from the parent container
+    // Clear any existing sprites from the parent container - IMPROVED CLEANUP
     if (graphics.parent) {
+      // Create a copy of children array to avoid modification during iteration
+      const childrenToRemove = [];
+      
       graphics.parent.children.forEach(child => {
+        // Remove any PIXI.Sprite that is not the graphics object itself
         if (child instanceof PIXI.Sprite && child !== graphics) {
+          childrenToRemove.push(child);
+        }
+        // Also remove any containers that might contain sprites (extra safety)
+        if (child instanceof PIXI.Container && child !== graphics && child.name && child.name.includes('SizeMattersPreview')) {
+          childrenToRemove.push(child);
+        }
+      });
+      
+      // Remove and destroy all identified children
+      childrenToRemove.forEach(child => {
+        try {
+          child.visible = false; // Hide immediately
           graphics.parent.removeChild(child);
+          child.destroy({ children: true, texture: false, baseTexture: false });
+        } catch (error) {
+          console.warn('Size Matters: Error removing preview sprite:', error);
         }
       });
     }
+
+    const scaleFactor = this.getPreviewScaleFactor();
 
     // Add effect image if available - BEHIND the grid graphics
     if (token && settings && settings.imageUrl && settings.imageUrl.trim() && settings.imageVisible) {
@@ -371,6 +443,7 @@ export class GridManager {
         const texture = await getTexture(settings.imageUrl);
         if (texture && graphics.parent) {
           const sprite = new PIXI.Sprite(texture);
+          sprite.name = 'SizeMattersPreviewEffect'; // Add name for easier identification
           sprite.anchor.set(0.5, 0.5);
           
           // CRÍTICO: Fazer o sprite COMPLETAMENTE não-interativo
@@ -379,22 +452,13 @@ export class GridManager {
           // Definir zIndex muito baixo para garantir que fique atrás
           sprite.zIndex = EFFECT_IMAGE_Z_INDEX;
           
-          // Calculate effect image dimensions
-          const gridType = canvas?.grid?.type || CONST.GRID_TYPES.SQUARE;
-          const isHexGrid = [
-            CONST.GRID_TYPES.HEXODDR,
-            CONST.GRID_TYPES.HEXEVENR,
-            CONST.GRID_TYPES.HEXODDQ,
-            CONST.GRID_TYPES.HEXEVENQ,
-          ].includes(gridType);
+          // Aplicar a escala base do preview multiplicada pela escala do usuário E o fator de zoom
+          const baseScale = EFFECT_IMAGE_PREVIEW_BASE_SCALE * scaleFactor;
+          const finalScale = (settings.imageScale || 1.0) * baseScale;
+          sprite.scale.set(finalScale);
           
-          const baseCellSize = isHexGrid ? (this.currentSvgRadius * 2) : this.currentSquareSize;
-          const imageScale = (settings.imageScale || 1.0) * EFFECT_IMAGE_PREVIEW_BASE_SCALE;
-          
-          sprite.scale.set(imageScale * baseCellSize / texture.width);
-          
-          // Apply offsets
-          const offsetScale = baseCellSize / IMAGE_OFFSET_SCALE_FACTOR;
+          // Apply offsets usando a escala base do preview E o fator de zoom
+          const offsetScale = EFFECT_IMAGE_PREVIEW_BASE_SCALE * scaleFactor;
           sprite.x = centerX + (settings.imageOffsetX || 0) * offsetScale;
           sprite.y = centerY + (settings.imageOffsetY || 0) * offsetScale;
           
@@ -405,7 +469,7 @@ export class GridManager {
           // Add ATRÁS do graphics
           graphics.parent.addChild(sprite);
           
-          console.log('Size Matters: Effect image sprite created with zIndex:', sprite.zIndex, 'interactive:', sprite.interactive);
+          console.log('Size Matters: Effect image sprite created with name:', sprite.name, 'zIndex:', sprite.zIndex);
         }
       } catch (error) {
         console.warn('Size Matters: Failed to load effect image for preview:', error);
@@ -418,6 +482,7 @@ export class GridManager {
         const texture = await getTexture(token.document.texture.src);
         if (texture && graphics.parent) {
           const sprite = new PIXI.Sprite(texture);
+          sprite.name = 'SizeMattersPreviewToken'; // Add name for easier identification
           sprite.anchor.set(0.5, 0.5);
           
           // CRÍTICO: Fazer o sprite COMPLETAMENTE não-interativo
@@ -426,7 +491,7 @@ export class GridManager {
           // Definir zIndex baixo mas maior que a imagem de efeito
           sprite.zIndex = TOKEN_IMAGE_Z_INDEX;
           
-          // Calculate token image size
+          // Calculate token image size with scale factor
           const gridType = canvas?.grid?.type || CONST.GRID_TYPES.SQUARE;
           const isHexGrid = [
             CONST.GRID_TYPES.HEXODDR,
@@ -437,9 +502,9 @@ export class GridManager {
           
           let tokenImageSize;
           if (isHexGrid) {
-            tokenImageSize = this.currentSvgRadius * TOKEN_HEX_IMAGE_SCALE_FACTOR;
+            tokenImageSize = this.currentSvgRadius * TOKEN_HEX_IMAGE_SCALE_FACTOR * scaleFactor;
           } else {
-            tokenImageSize = this.currentSquareSize * TOKEN_SQUARE_IMAGE_SCALE_FACTOR;
+            tokenImageSize = this.currentSquareSize * TOKEN_SQUARE_IMAGE_SCALE_FACTOR * scaleFactor;
           }
           
           sprite.scale.set(tokenImageSize / texture.width);
@@ -450,10 +515,16 @@ export class GridManager {
           // Add ATRÁS do graphics
           graphics.parent.addChild(sprite);
           
+          console.log('Size Matters: Token image sprite created with name:', sprite.name, 'zIndex:', sprite.zIndex);
         }
       } catch (error) {
         console.warn('Size Matters: Failed to load token image for preview:', error);
       }
+    }
+    
+    // Force stage sorting to ensure proper layering
+    if (graphics.parent && graphics.parent.sortableChildren) {
+      graphics.parent.sortChildren();
     }
   }
 

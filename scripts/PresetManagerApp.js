@@ -8,6 +8,9 @@ export class PresetManagerApp extends FormApplication {
     super(options);
     this.sizeMattersApp = sizeMattersApp;
     this.presets = {};
+    this.selectedPresetForPlacement = null;
+    this.placementModeActive = false;
+    this.canvasClickHandler = null;
     this.loadPresets();
   }
 
@@ -38,20 +41,23 @@ export class PresetManagerApp extends FormApplication {
   }
 
   getData() {
-    // Sempre recarregar presets das configurações do jogo antes de renderizar
+    // Always reload presets from game settings before rendering
     this.loadPresets();
     
     const presetsArray = Object.entries(this.presets).map(([name, preset]) => ({
       name: name,
       ...preset,
       hasGrid: preset.grid && Object.values(preset.grid).some(cell => cell.selected),
-      selectedCellCount: preset.grid ? Object.values(preset.grid).filter(cell => cell.selected).length : 0
+      selectedCellCount: preset.grid ? Object.values(preset.grid).filter(cell => cell.selected).length : 0,
+      isSelected: this.selectedPresetForPlacement === name
     }));
 
     return {
       presets: presetsArray,
       hasPresets: presetsArray.length > 0,
-      canSaveCurrent: !!this.sizeMattersApp && !!this.sizeMattersApp.token
+      canSaveCurrent: !!this.sizeMattersApp && !!this.sizeMattersApp.token,
+      selectedPresetForPlacement: this.selectedPresetForPlacement,
+      placementModeActive: this.placementModeActive
     };
   }
 
@@ -62,6 +68,73 @@ export class PresetManagerApp extends FormApplication {
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Placement mode checkbox
+    html.find('#placement-mode-checkbox').change((event) => {
+      this.placementModeActive = event.target.checked;
+      
+      if (this.placementModeActive) {
+        // Don't require preset selection to activate placement mode
+        ui.notifications.info("Placement mode activated! Select a preset by clicking on a thumbnail, then click on canvas to place effect tokens.");
+        this.activateCanvasPlacementMode();
+      } else {
+        this.deactivateCanvasPlacementMode();
+        ui.notifications.info("Placement mode deactivated.");
+      }
+      
+      // Re-render to update UI state
+      this.render(true);
+    });
+
+    // Preset selection for placement - now works by clicking thumbnails directly
+    html.find('.sm-preset-item').click(async (event) => {
+      // Don't trigger if clicking on delete button
+      if (event.target.closest('.sm-delete-preset-btn')) return;
+      
+      const presetName = event.currentTarget.dataset.presetName;
+      const preset = this.presets[presetName];
+      
+      if (!preset) {
+        ui.notifications.error(`Preset "${presetName}" not found!`);
+        return;
+      }
+
+      // If placement mode is active, select this preset for placement
+      if (this.placementModeActive) {
+        this.selectedPresetForPlacement = presetName;
+        this.render(true); // Re-render to show selection
+        return;
+      }
+
+      // If placement mode is not active, apply preset to selected token
+      const selectedTokens = canvas.tokens.controlled;
+      if (selectedTokens.length === 0) {
+        ui.notifications.warn("Select a token first to apply the preset!");
+        return;
+      }
+
+      const token = selectedTokens[0];
+      if (!token || !token.document || !token.actor) {
+        ui.notifications.error("Invalid token or token has no actor!");
+        return;
+      }
+
+      // Apply preset to selected token using the main module API
+      if (game.modules.get("size-matters").api.togglePresetOnToken) {
+        await game.modules.get("size-matters").api.togglePresetOnToken(presetName);
+        
+        // Set the associatedPreset flag on the actor so the HUD button appears
+        await token.actor.setFlag("size-matters", "associatedPreset", presetName);
+        
+        // Force re-render of the token HUD to show/update the button immediately
+        if (token.hasActiveHUD) {
+          token.layer.hud.render(true);
+        }
+        
+      } else {
+        ui.notifications.error("Size Matters API not available!");
+      }
+    });
 
     // Save current configuration as preset
     html.find('.sm-save-current-btn').click(async () => {
@@ -103,50 +176,6 @@ export class PresetManagerApp extends FormApplication {
       // Clear input and re-render
       presetNameInput.val('');
       this.render(true);
-    });
-
-    // Apply preset when clicking on preset item
-    html.find('.sm-preset-item').click(async (event) => {
-      // Don't trigger if clicking on delete button
-      if (event.target.closest('.sm-delete-preset-btn')) return;
-      
-      const presetName = event.currentTarget.dataset.presetName;
-      const preset = this.presets[presetName];
-      
-      if (!preset) {
-        ui.notifications.error(`Preset "${presetName}" not found!`);
-        return;
-      }
-
-      // Get the currently controlled token
-      const selectedTokens = canvas.tokens.controlled;
-      if (selectedTokens.length === 0) {
-        ui.notifications.warn("Select a token first to apply the preset!");
-        return;
-      }
-
-      const token = selectedTokens[0];
-      if (!token || !token.document || !token.actor) {
-        ui.notifications.error("Invalid token or token has no actor!");
-        return;
-      }
-
-      // Apply preset to selected token using the main module API
-      if (game.modules.get("size-matters").api.togglePresetOnToken) {
-        await game.modules.get("size-matters").api.togglePresetOnToken(presetName);
-        
-        // Set the associatedPreset flag on the actor so the HUD button appears
-        await token.actor.setFlag("size-matters", "associatedPreset", presetName);
-        
-        // Force re-render of the token HUD to show/update the button immediately
-        if (token.hasActiveHUD) {
-          token.layer.hud.render(true);
-        }
-        
-        ui.notifications.info(`Preset "${presetName}" applied and associated with ${token.name}!`);
-      } else {
-        ui.notifications.error("Size Matters API not available!");
-      }
     });
 
     // Delete preset
@@ -230,6 +259,103 @@ export class PresetManagerApp extends FormApplication {
       URL.revokeObjectURL(url);
       ui.notifications.info("All presets exported!");
     });
+  }
+
+  /**
+   * Activates canvas placement mode
+   */
+  activateCanvasPlacementMode() {
+    // Remove any existing handler
+    this.deactivateCanvasPlacementMode();
+
+    // Create the canvas click handler
+    this.canvasClickHandler = this.onCanvasClick.bind(this);
+    
+    // Add event listener to canvas
+    if (canvas && canvas.stage) {
+      canvas.stage.on('pointerdown', this.canvasClickHandler);
+      canvas.stage.interactive = true;
+    }
+
+    // Change cursor to indicate placement mode
+    if (canvas && canvas.app && canvas.app.view) {
+      canvas.app.view.style.cursor = 'crosshair';
+    }
+  }
+
+  /**
+   * Deactivates canvas placement mode
+   */
+  deactivateCanvasPlacementMode() {
+    // Remove event listener
+    if (this.canvasClickHandler && canvas && canvas.stage) {
+      canvas.stage.off('pointerdown', this.canvasClickHandler);
+    }
+    
+    this.canvasClickHandler = null;
+
+    // Reset cursor
+    if (canvas && canvas.app && canvas.app.view) {
+      canvas.app.view.style.cursor = 'default';
+    }
+  }
+
+  /**
+   * Handles canvas click events for token placement
+   */
+  async onCanvasClick(event) {
+    if (!this.placementModeActive || !this.selectedPresetForPlacement) {
+      if (!this.selectedPresetForPlacement && this.placementModeActive) {
+        ui.notifications.warn("Select a preset first by clicking on a thumbnail!");
+      }
+      return;
+    }
+
+    // Get click position
+    const position = event.data.getLocalPosition(canvas.stage);
+    
+    // Snap to grid
+    const snappedPosition = canvas.grid.getSnappedPosition(position.x, position.y);
+    
+    try {
+      // Create invisible token
+      const tokenData = {
+        name: `Effect ${this.selectedPresetForPlacement}`,
+        x: snappedPosition.x,
+        y: snappedPosition.y,
+        width: 1,
+        height: 1,
+        img: "icons/svg/mystery-man.svg", // Default token image
+        hidden: false, // Make token visible to all users so they can see the effects
+        alpha: 0.01, // Make token image nearly invisible while keeping effects visible
+        flags: {
+          "size-matters": {
+            settings: foundry.utils.duplicate(this.presets[this.selectedPresetForPlacement]),
+            activePreset: this.selectedPresetForPlacement,
+            isEffectToken: true // Mark as effect token
+          }
+        }
+      };
+
+      // Create the token
+      const tokenDocument = await canvas.scene.createEmbeddedDocuments("Token", [tokenData]);
+      
+      if (tokenDocument && tokenDocument[0]) {
+        // Token graphics will be drawn automatically via the createToken hook
+        ui.notifications.info(`Effect token "${this.selectedPresetForPlacement}" placed successfully!`);
+      }
+    } catch (error) {
+      console.error("Size Matters: Error creating effect token:", error);
+      ui.notifications.error("Error creating effect token!");
+    }
+  }
+
+  /**
+   * Override close to cleanup placement mode
+   */
+  async close(options = {}) {
+    this.deactivateCanvasPlacementMode();
+    return super.close(options);
   }
 
   /**
@@ -332,7 +458,6 @@ export class PresetManagerApp extends FormApplication {
       message += ` Skipped ${skipped} existing preset(s).`;
     }
     
-    ui.notifications.info(message);
   }
 
   /**

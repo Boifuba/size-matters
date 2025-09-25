@@ -123,6 +123,28 @@ function _registerAllModuleHooks() {
     })
   );
 
+  // Token creation hook for effect tokens
+  _sizeMattersRegisteredHooks.push(
+    Hooks.on("createToken", async (tokenDocument, options, userId) => {
+      // Check if this is an effect token with Size Matters settings
+      const isEffectToken = tokenDocument.getFlag("size-matters", "isEffectToken");
+      const settings = tokenDocument.getFlag("size-matters", "settings");
+      
+      if (isEffectToken && settings) {
+        // Wait a moment for the token to be fully available in canvas.tokens
+        setTimeout(async () => {
+          const token = canvas.tokens.get(tokenDocument.id);
+          if (token) {
+            console.log(`Size Matters: Drawing graphics for effect token ${tokenDocument.id}`);
+            await drawSizeMattersGraphicsForToken(token);
+          } else {
+            console.warn(`Size Matters: Effect token ${tokenDocument.id} not found in canvas.tokens`);
+          }
+        }, 100);
+      }
+    })
+  );
+
   // ===================================================================
   // HOOKS DE EXCLUSÃO DE TOKEN - VERSÃO CORRETA E SEGURA
   // ===================================================================
@@ -230,6 +252,9 @@ function _registerAllModuleHooks() {
   // Module settings hook
   _sizeMattersRegisteredHooks.push(
     Hooks.on("renderModuleManagement", (app, html) => {
+     // Ensure html is a jQuery object
+     html = $(html);
+     
       const moduleRow = html.find('li[data-module-id="size-matters"]');
       if (moduleRow.find('.size-matters-clear-data-button').length > 0) return;
       const clearDataButton = $(`
@@ -458,6 +483,7 @@ Hooks.once("ready", () => {
       targetedCleanupTokenGraphics(tokenId);
     }
     
+    // Handle effect token graphics synchronization
     // Handle effect removal synchronization
     if (data.action === "removeTokenEffect" && data.payload) {
       const { tokenId, sceneId } = data.payload;
